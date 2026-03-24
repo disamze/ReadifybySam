@@ -1,0 +1,43 @@
+:root {
+  --bg: #0b1020;
+  --card: rgba(255, 255, 255, 0.12);
+  --text: #f2f4ff;
+  --accent: #8b5cf6;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: Inter, Arial, sans-serif;
+  background: linear-gradient(120deg, #0b1020, #111827);
+  color: var(--text);
+}
+.hidden { display: none !important; }
+.loader {
+  position: fixed; inset: 0; display: grid; place-items: center;
+  background: radial-gradient(circle, #3b82f6, #111827);
+  z-index: 10;
+  animation: fadeOut 6s forwards;
+}
+.loader h1 { font-size: clamp(2rem, 6vw, 4rem); letter-spacing: 2px; }
+@keyframes fadeOut { 0%, 82% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+.center-screen { min-height: 100vh; display: grid; place-items: center; padding: 1rem; }
+.glass {
+  backdrop-filter: blur(18px); background: var(--card); border: 1px solid rgba(255,255,255,.22);
+  border-radius: 18px; box-shadow: 0 10px 35px rgba(0,0,0,.4);
+}
+.card { max-width: 520px; width: 100%; padding: 1.3rem; }
+input, textarea, button, select { width: 100%; margin: .45rem 0; padding: .75rem; border-radius: 10px; border: none; }
+button { background: linear-gradient(90deg, #7c3aed, #2563eb); color: #fff; cursor: pointer; transition: .25s; }
+button:hover { transform: translateY(-2px); filter: brightness(1.06); }
+.toggle-row { display: flex; gap: .6rem; align-items: center; }
+.toggle-row label { display: flex; align-items: center; gap: .4rem; }
+.hero { padding: 1rem 1.2rem 2.5rem; background: linear-gradient(to bottom, rgba(59,130,246,.35), transparent); }
+.parallax { background-attachment: fixed; }
+nav { display: flex; justify-content: space-between; align-items: center; }
+.hero-content { text-align: center; margin-top: 2rem; }
+.section { padding: 1rem; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .8rem; }
+.book, .panel { padding: 1rem; border-radius: 12px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15); }
+.small { font-size: .9rem; opacity: .85; }
+footer { text-align: center; padding: 1.5rem; opacity: .85; }
+@media (max-width: 760px) { .toggle-row { flex-direction: column; align-items: stretch; } nav { flex-direction: column; gap: .6rem; } .parallax { background-attachment: scroll; } }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ReadifyBySam | User</title>
+  <title>ReadifyBySam | Home</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Sora:wght@600;700&display=swap" rel="stylesheet">
@@ -13,34 +13,38 @@
   <div class="sticky-nav">
     <div class="nav-inner">
       <h1>ReadifyBySam</h1>
-      <nav id="user-nav">
-        <a href="#home">Home</a>
-        <a href="#books">Books</a>
-        <a href="#cart">Cart</a>
-        <a href="#library">Library</a>
-        <a href="#testimonials">Testimonials</a>
-        <a href="#about">About</a>
+      <nav>
+        <a href="/user.html">Home</a>
+        <a href="/books.html">Books</a>
+        <a href="/library.html">Library</a>
+        <a href="/cart.html" class="cart-link">🛒 Cart</a>
         <a href="#contact">Contact</a>
       </nav>
       <div class="nav-right"><span id="welcome"></span><button id="logout-btn">Logout</button></div>
     </div>
   </div>
 
-  <section id="home" class="hero page"><div class="wide hero-content"><p class="hero-chip">Professional bookstore platform</p><h2>Reading begins here.</h2><p>Discover premium books and access approved PDFs with secure workflow.</p></div></section>
-  <section id="stats" class="section wide grid"></section>
-  <section id="books" class="section wide"></section>
-  <section id="cart" class="section wide"></section>
-  <section id="library" class="section wide"></section>
-  <section id="testimonials" class="section wide"></section>
-  <section id="about" class="section wide panel">
-    <h3>About ReadifyBySam</h3>
-    <p>We provide carefully selected digital books for students and self-learners. Every purchase is manually approved to ensure trusted delivery and clean experience.</p>
-    <ul>
-      <li>Secure admin approval before digital delivery.</li>
-      <li>Curated and editable testimonials.</li>
-      <li>Fast support and responsive design across devices.</li>
-    </ul>
+  <section id="home" class="hero page">
+    <div class="wide hero-content">
+      <p class="hero-chip">Professional bookstore platform</p>
+      <div id="book-anim" class="book-anim">
+        <div class="book-left"></div>
+        <div class="book-right"></div>
+        <div class="book-content">
+          <h2>Reading begins here.</h2>
+          <p>As the book opens, your learning journey starts. Premium books, secure payment approvals, and instant library access after admin confirmation.</p>
+          <div class="hero-actions">
+            <a class="btn-link" href="/books.html">Explore Books</a>
+            <a class="btn-link ghost" href="/cart.html">Go to Cart</a>
+          </div>
+        </div>
+      </div>
+    </div>
   </section>
+
+  <section id="stats" class="section wide grid"></section>
+  <section id="testimonials" class="section wide"></section>
+
   <section id="contact" class="section wide contact-shell">
     <h3>Contact Us</h3>
     <form id="contact-form" class="contact-form">

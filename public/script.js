@@ -1,15 +1,13 @@
 const q = (s) => document.querySelector(s);
 const words = ['Reading', 'begins', 'here'];
 const loaderWord = q('#loader-word');
-const loaderFill = q('#loader-fill');
 
 (function runLoader() {
   let index = 0;
   const start = performance.now();
-  const duration = 2600;
+  const duration = 3000;
   function animate(now) {
     const progress = Math.min(1, (now - start) / duration);
-    loaderFill.style.width = `${progress * 100}%`;
     const wordIndex = Math.min(words.length - 1, Math.floor(progress * words.length));
     if (wordIndex !== index) {
       index = wordIndex;
@@ -17,8 +15,11 @@ const loaderFill = q('#loader-fill');
     }
     if (progress < 1) requestAnimationFrame(animate);
     else {
-      q('#loader').style.display = 'none';
-      q('#auth-screen').classList.remove('hidden');
+      q('#loader').style.opacity = '0';
+      setTimeout(() => {
+        q('#loader').style.display = 'none';
+        q('#auth-screen').classList.remove('hidden');
+      }, 350);
     }
   }
   requestAnimationFrame(animate);

@@ -29,10 +29,6 @@
           <input id="signup-name" placeholder="Full Name" required />
           <input id="signup-email" type="email" placeholder="Email" required />
           <input id="signup-password" type="password" placeholder="Password" required />
-          <select id="signup-role">
-            <option value="user">User</option>
-            <option value="admin">Admin</option>
-          </select>
           <button type="submit">Sign Up</button>
           <p id="signup-msg" class="status"></p>
         </form>
@@ -43,6 +39,12 @@
           <h2>Sign In</h2>
           <input id="login-email" type="email" placeholder="Email" required />
           <input id="login-password" type="password" placeholder="Password" required />
+          <div class="role-switch" id="login-role-switch">
+            <button type="button" class="role-btn active" data-role="user">User</button>
+            <button type="button" class="role-btn" data-role="admin">Admin</button>
+            <span class="role-pill"></span>
+          </div>
+          <input type="hidden" id="login-role" value="user" />
           <button type="submit">Sign In</button>
           <p id="login-msg" class="status"></p>
         </form>

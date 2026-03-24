@@ -137,9 +137,10 @@ app.post('/api/auth/signup', async (req, res) => {
   res.json({ message: 'Signup successful. Please login.' });
 });
 app.post('/api/auth/login', async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, role } = req.body;
   const user = await User.findOne({ email: (email || '').toLowerCase() });
   if (!user || !bcrypt.compareSync(password || '', user.password_hash)) return res.status(401).json({ error: 'Invalid credentials' });
+  if (role && role !== user.role) return res.status(403).json({ error: `This account is registered as ${user.role}.` });
   req.session.user = { id: user._id.toString(), name: user.name, role: user.role, email: user.email };
   res.json({ user: req.session.user });
 });

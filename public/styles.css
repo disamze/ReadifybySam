@@ -220,3 +220,47 @@ footer{text-align:center;padding:1.6rem;color:var(--muted)}
   90% { transform: translate(2px, 1px) rotate(0deg); }
   100% { transform: translate(1px, -2px) rotate(-1deg); }
 }
+
+/* Auth overlap fixes + login role slider */
+.auth-panel-form h2 { margin: 0 0 .35rem; }
+.auth-panel-form input, .auth-panel-form select { margin: .35rem 0; }
+.auth-panel-form .status { margin-top: .45rem; }
+.auth-shell { min-height: 520px; }
+
+.role-switch {
+  --pill-x: 0%;
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: .55rem 0;
+  background: rgba(255,255,255,.06);
+}
+.role-pill {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: calc(50% - 6px);
+  height: calc(100% - 6px);
+  border-radius: 999px;
+  background: linear-gradient(95deg,#6d28d9,#0891b2);
+  transform: translateX(var(--pill-x));
+  transition: transform .25s ease;
+  z-index: 0;
+}
+.role-btn {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding: .55rem .5rem;
+  border: none;
+  background: transparent;
+  color: #dbeafe;
+}
+.role-btn.active { color: #fff; font-weight: 700; }
+
+@media (max-width: 900px) {
+  .auth-shell { min-height: 560px; }
+}

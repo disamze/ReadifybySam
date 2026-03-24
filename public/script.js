@@ -36,6 +36,18 @@ const authShell = q('#auth-shell');
 q('#show-signup').onclick = () => authShell.classList.add('right-panel-active');
 q('#show-signin').onclick = () => authShell.classList.remove('right-panel-active');
 
+
+const roleSwitch = q('#login-role-switch');
+const roleHidden = q('#login-role');
+roleSwitch.querySelectorAll('.role-btn').forEach((btn, idx) => {
+  btn.onclick = () => {
+    roleSwitch.querySelectorAll('.role-btn').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    roleHidden.value = btn.dataset.role;
+    roleSwitch.style.setProperty('--pill-x', `${idx * 100}%`);
+  };
+});
+
 q('#signup-form').onsubmit = async (e) => {
   e.preventDefault();
   try {
@@ -46,7 +58,7 @@ q('#signup-form').onsubmit = async (e) => {
         name: q('#signup-name').value,
         email: q('#signup-email').value,
         password: q('#signup-password').value,
-        role: q('#signup-role').value
+        role: 'user'
       })
     });
     q('#signup-msg').textContent = 'Signup successful! Please sign in.';
@@ -64,7 +76,8 @@ q('#login-form').onsubmit = async (e) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: q('#login-email').value,
-        password: q('#login-password').value
+        password: q('#login-password').value,
+        role: q('#login-role').value
       })
     });
     location.href = user.role === 'admin' ? '/admin.html' : '/user.html';

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ReadifyBySam | Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body class="auth-body">
+  <div id="loader" class="loader">
+    <div class="loader-card">
+      <h1 class="brand">ReadifyBySam</h1>
+      <h2 id="loader-word" class="loader-word">Reading</h2>
+      <div class="loader-track"><span id="loader-fill"></span></div>
+      <p class="muted">Preparing your smart bookstore...</p>
+    </div>
+  </div>
+
+  <main id="auth-screen" class="center-screen hidden">
+    <div class="glass card">
+      <h2>Welcome 👋</h2>
+      <p class="muted">Signup or login to continue</p>
+      <form id="auth-form">
+        <input id="name" placeholder="Full Name" />
+        <input id="email" type="email" placeholder="Email" required />
+        <input id="password" type="password" placeholder="Password" required />
+        <div class="toggle-row">
+          <label><input type="radio" name="role" value="user" checked /> User</label>
+          <label><input type="radio" name="role" value="admin" /> Admin</label>
+        </div>
+        <div class="toggle-row">
+          <button type="button" id="signup-btn">Signup</button>
+          <button type="button" id="login-btn" class="ghost">Login</button>
+        </div>
+      </form>
+      <p id="auth-msg" class="status"></p>
+      <p class="small muted">Admin accounts are allowed based on selected role.</p>
+    </div>
+  </main>
+
+  <script src="/script.js"></script>
+</body>
+</html>

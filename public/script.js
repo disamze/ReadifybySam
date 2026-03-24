@@ -3,11 +3,10 @@ const words = ['Reading', 'begins', 'here'];
 const loaderWord = q('#loader-word');
 const loaderFill = q('#loader-fill');
 
-function runLoader() {
+(function runLoader() {
   let index = 0;
   const start = performance.now();
-  const duration = 3200;
-
+  const duration = 2600;
   function animate(now) {
     const progress = Math.min(1, (now - start) / duration);
     loaderFill.style.width = `${progress * 100}%`;
@@ -23,8 +22,7 @@ function runLoader() {
     }
   }
   requestAnimationFrame(animate);
-}
-runLoader();
+})();
 
 async function api(url, options = {}) {
   const res = await fetch(url, options);
@@ -33,37 +31,43 @@ async function api(url, options = {}) {
   return data;
 }
 
-function authValues() {
-  return {
-    name: q('#name').value,
-    email: q('#email').value,
-    password: q('#password').value,
-    role: document.querySelector('input[name="role"]:checked').value
-  };
-}
+const authShell = q('#auth-shell');
+q('#show-signup').onclick = () => authShell.classList.add('right-panel-active');
+q('#show-signin').onclick = () => authShell.classList.remove('right-panel-active');
 
-q('#signup-btn').onclick = async () => {
+q('#signup-form').onsubmit = async (e) => {
+  e.preventDefault();
   try {
     await api('/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(authValues())
+      body: JSON.stringify({
+        name: q('#signup-name').value,
+        email: q('#signup-email').value,
+        password: q('#signup-password').value,
+        role: q('#signup-role').value
+      })
     });
-    q('#auth-msg').textContent = 'Signup successful. Please login.';
-  } catch (e) {
-    q('#auth-msg').textContent = e.message;
+    q('#signup-msg').textContent = 'Signup successful! Please sign in.';
+    authShell.classList.remove('right-panel-active');
+  } catch (err) {
+    q('#signup-msg').textContent = err.message;
   }
 };
 
-q('#login-btn').onclick = async () => {
+q('#login-form').onsubmit = async (e) => {
+  e.preventDefault();
   try {
     const { user } = await api('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(authValues())
+      body: JSON.stringify({
+        email: q('#login-email').value,
+        password: q('#login-password').value
+      })
     });
     location.href = user.role === 'admin' ? '/admin.html' : '/user.html';
-  } catch (e) {
-    q('#auth-msg').textContent = e.message;
+  } catch (err) {
+    q('#login-msg').textContent = err.message;
   }
 };

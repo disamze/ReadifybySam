@@ -5,14 +5,11 @@ const express = require('express');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
-const Database = require('better-sqlite3');
 const nodemailer = require('nodemailer');
+const mongoose = require('mongoose');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
-
-const DB_PATH = path.join(__dirname, 'readify.db');
-const db = new Database(DB_PATH);
 
 ['uploads/books', 'uploads/payments', 'uploads/qr'].forEach((dir) => {
   const full = path.join(__dirname, dir);
@@ -29,115 +26,54 @@ app.use(
     cookie: { maxAge: 1000 * 60 * 60 * 24 }
   })
 );
-
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(express.static(path.join(__dirname, 'public')));
 
-function initDB() {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      email TEXT UNIQUE NOT NULL,
-      password_hash TEXT NOT NULL,
-      role TEXT NOT NULL CHECK(role IN ('user','admin')),
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
+const UserSchema = new mongoose.Schema({ name: String, email: { type: String, unique: true }, password_hash: String, role: { type: String, enum: ['user', 'admin'] } }, { timestamps: true });
+const SettingsSchema = new mongoose.Schema({ site_name: { type: String, default: 'ReadifyBySam' }, upi_qr_path: { type: String, default: '' }, upi_id: { type: String, default: '' } }, { timestamps: true });
+const BookSchema = new mongoose.Schema({ title: String, author: String, description: String, price: Number, cover_url: String, pdf_path: String }, { timestamps: true });
+const TestimonialSchema = new mongoose.Schema({ name: String, content: String, rating: { type: Number, default: 5 } }, { timestamps: true });
+const OrderSchema = new mongoose.Schema({ user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, total: Number, status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' }, payment_screenshot: String, items: [{ book_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Book' }, quantity: Number, price: Number }] }, { timestamps: true });
+const ContactSchema = new mongoose.Schema({ name: String, email: String, message: String }, { timestamps: true });
 
-    CREATE TABLE IF NOT EXISTS settings (
-      id INTEGER PRIMARY KEY CHECK(id = 1),
-      site_name TEXT DEFAULT 'ReadifyBySam',
-      upi_qr_path TEXT DEFAULT '',
-      upi_id TEXT DEFAULT ''
-    );
+const User = mongoose.model('User', UserSchema);
+const Settings = mongoose.model('Settings', SettingsSchema);
+const Book = mongoose.model('Book', BookSchema);
+const Testimonial = mongoose.model('Testimonial', TestimonialSchema);
+const Order = mongoose.model('Order', OrderSchema);
+const ContactMessage = mongoose.model('ContactMessage', ContactSchema);
 
-    CREATE TABLE IF NOT EXISTS books (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT NOT NULL,
-      author TEXT NOT NULL,
-      description TEXT DEFAULT '',
-      price REAL NOT NULL,
-      cover_url TEXT DEFAULT '',
-      pdf_path TEXT NOT NULL,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
+async function initMongo() {
+  const uri = process.env.MONGODB_URI;
+  if (!uri) throw new Error('MONGODB_URI is required');
+  await mongoose.connect(uri);
 
-    CREATE TABLE IF NOT EXISTS testimonials (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      content TEXT NOT NULL,
-      rating INTEGER DEFAULT 5,
-      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS orders (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      total REAL NOT NULL,
-      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')),
-      payment_screenshot TEXT,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(user_id) REFERENCES users(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS order_items (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      order_id INTEGER NOT NULL,
-      book_id INTEGER NOT NULL,
-      quantity INTEGER NOT NULL,
-      price REAL NOT NULL,
-      FOREIGN KEY(order_id) REFERENCES orders(id),
-      FOREIGN KEY(book_id) REFERENCES books(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS contact_messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      email TEXT NOT NULL,
-      message TEXT NOT NULL,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  db.prepare('INSERT OR IGNORE INTO settings (id) VALUES (1)').run();
-
-  const adminEmail = process.env.DEFAULT_ADMIN_EMAIL || 'admin@readifybysam.com';
+  const adminEmail = (process.env.DEFAULT_ADMIN_EMAIL || 'admin@readifybysam.com').toLowerCase();
   const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD || 'Admin@12345';
   const adminName = process.env.DEFAULT_ADMIN_NAME || 'Readify Admin';
 
-  const existingAdmin = db.prepare('SELECT id FROM users WHERE email = ?').get(adminEmail);
+  const existingAdmin = await User.findOne({ email: adminEmail });
   if (!existingAdmin) {
     const hash = bcrypt.hashSync(adminPassword, 10);
-    db.prepare('INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)').run(adminName, adminEmail, hash, 'admin');
+    await User.create({ name: adminName, email: adminEmail, password_hash: hash, role: 'admin' });
     console.log(`Seeded admin: ${adminEmail} / ${adminPassword}`);
   }
 
-  const testCount = db.prepare('SELECT COUNT(*) as count FROM testimonials').get().count;
-  if (!testCount) {
-    const stmt = db.prepare('INSERT INTO testimonials (name, content, rating) VALUES (?, ?, ?)');
-    stmt.run('Aanya Sharma', 'Loved the premium notes and beginner-friendly books!', 5);
-    stmt.run('Raghav Mehta', 'Super smooth checkout and instant approval by admin.', 5);
-    stmt.run('Priya Nair', 'Design is beautiful and books are very practical.', 4);
+  const settings = await Settings.findOne();
+  if (!settings) await Settings.create({});
+
+  if ((await Testimonial.countDocuments()) === 0) {
+    await Testimonial.insertMany([
+      { name: 'Aanya Sharma', content: 'Loved the premium notes and beginner-friendly books!', rating: 5 },
+      { name: 'Raghav Mehta', content: 'Super smooth checkout and instant approval by admin.', rating: 5 },
+      { name: 'Priya Nair', content: 'Design is beautiful and books are very practical.', rating: 4 }
+    ]);
   }
 }
 
-initDB();
-
-const storageBooks = multer.diskStorage({
-  destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/books')),
-  filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`)
-});
-
-const storagePayments = multer.diskStorage({
-  destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/payments')),
-  filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`)
-});
-
-const storageQR = multer.diskStorage({
-  destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/qr')),
-  filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`)
-});
-
+const storageBooks = multer.diskStorage({ destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/books')), filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`) });
+const storagePayments = multer.diskStorage({ destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/payments')), filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`) });
+const storageQR = multer.diskStorage({ destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/qr')), filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`) });
 const uploadBook = multer({ storage: storageBooks });
 const uploadPayment = multer({ storage: storagePayments });
 const uploadQR = multer({ storage: storageQR });
@@ -145,215 +81,118 @@ const uploadQR = multer({ storage: storageQR });
 const isAuth = (req, res, next) => (req.session.user ? next() : res.status(401).json({ error: 'Unauthorized' }));
 const isAdmin = (req, res, next) => (req.session.user?.role === 'admin' ? next() : res.status(403).json({ error: 'Forbidden' }));
 
-function publicStats() {
-  const purchased = db
-    .prepare('SELECT IFNULL(SUM(quantity), 0) as purchased FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.status = ?')
-    .get('approved').purchased;
-  const testimonials = db.prepare('SELECT id, name, content, rating FROM testimonials ORDER BY id DESC').all();
-  const books = db.prepare('SELECT id, title, author, description, price, cover_url FROM books ORDER BY id DESC').all();
-  const settings = db.prepare('SELECT site_name, upi_qr_path, upi_id FROM settings WHERE id = 1').get();
+async function publicStats() {
+  const approvedOrders = await Order.find({ status: 'approved' }, { items: 1 });
+  const purchased = approvedOrders.reduce((sum, order) => sum + order.items.reduce((acc, i) => acc + i.quantity, 0), 0);
+  const testimonials = await Testimonial.find({}, { name: 1, content: 1, rating: 1 }).sort({ createdAt: -1 }).lean();
+  const books = await Book.find({}, { title: 1, author: 1, description: 1, price: 1, cover_url: 1 }).sort({ createdAt: -1 }).lean();
+  const settings = await Settings.findOne({}, { site_name: 1, upi_qr_path: 1, upi_id: 1 }).lean();
   return { purchased, testimonials, books, settings };
 }
 
-app.get('/api/public-data', (_, res) => {
-  res.json(publicStats());
-});
+app.get('/api/public-data', async (_, res) => res.json(await publicStats()));
 
-app.post('/api/auth/signup', (req, res) => {
+app.post('/api/auth/signup', async (req, res) => {
   const { name, email, password, role } = req.body;
-  if (!name || !email || !password || !['user', 'admin'].includes(role)) {
-    return res.status(400).json({ error: 'Invalid signup details.' });
-  }
-
-  const exists = db.prepare('SELECT id FROM users WHERE email = ?').get(email.toLowerCase());
-  if (exists) return res.status(409).json({ error: 'Email already registered.' });
-
+  if (!name || !email || !password || !['user', 'admin'].includes(role)) return res.status(400).json({ error: 'Invalid signup details.' });
+  if (await User.findOne({ email: email.toLowerCase() })) return res.status(409).json({ error: 'Email already registered.' });
   const hash = bcrypt.hashSync(password, 10);
-  db.prepare('INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)').run(name, email.toLowerCase(), hash, role);
+  await User.create({ name, email: email.toLowerCase(), password_hash: hash, role });
   res.json({ message: 'Signup successful. Please login.' });
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get((email || '').toLowerCase());
-  if (!user || !bcrypt.compareSync(password || '', user.password_hash)) {
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
-  req.session.user = { id: user.id, name: user.name, role: user.role, email: user.email };
+  const user = await User.findOne({ email: (email || '').toLowerCase() });
+  if (!user || !bcrypt.compareSync(password || '', user.password_hash)) return res.status(401).json({ error: 'Invalid credentials' });
+  req.session.user = { id: user._id.toString(), name: user.name, role: user.role, email: user.email };
   res.json({ user: req.session.user });
 });
+app.post('/api/auth/logout', (req, res) => req.session.destroy(() => res.json({ message: 'Logged out' })));
+app.get('/api/auth/me', (req, res) => res.json({ user: req.session.user || null }));
 
-app.post('/api/auth/logout', (req, res) => {
-  req.session.destroy(() => res.json({ message: 'Logged out' }));
-});
+app.get('/api/books', async (_, res) => res.json(await Book.find({}, { title: 1, author: 1, description: 1, price: 1, cover_url: 1 }).sort({ createdAt: -1 }).lean()));
 
-app.get('/api/auth/me', (req, res) => {
-  res.json({ user: req.session.user || null });
-});
-
-app.get('/api/books', (_, res) => {
-  res.json(db.prepare('SELECT id, title, author, description, price, cover_url FROM books ORDER BY id DESC').all());
-});
-
-app.post('/api/orders', isAuth, uploadPayment.single('payment_screenshot'), (req, res) => {
+app.post('/api/orders', isAuth, uploadPayment.single('payment_screenshot'), async (req, res) => {
   if (req.session.user.role !== 'user') return res.status(403).json({ error: 'Only users can place orders' });
   const items = JSON.parse(req.body.items || '[]');
   if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: 'Cart is empty' });
 
-  const booksLookup = db.prepare('SELECT id, price FROM books WHERE id = ?');
-  let total = 0;
+  const ids = items.map((i) => i.bookId);
+  const books = await Book.find({ _id: { $in: ids } }, { price: 1 }).lean();
+  const map = new Map(books.map((b) => [b._id.toString(), b]));
   const sanitized = [];
+  let total = 0;
   for (const item of items) {
-    const book = booksLookup.get(item.bookId);
-    const qty = Math.max(1, Number(item.quantity || 1));
-    if (!book) continue;
-    total += book.price * qty;
-    sanitized.push({ bookId: book.id, quantity: qty, price: book.price });
+    const b = map.get(item.bookId);
+    if (!b) continue;
+    const quantity = Math.max(1, Number(item.quantity || 1));
+    total += b.price * quantity;
+    sanitized.push({ book_id: b._id, quantity, price: b.price });
   }
   if (!sanitized.length) return res.status(400).json({ error: 'No valid books in cart' });
 
-  const orderTx = db.transaction(() => {
-    const orderResult = db
-      .prepare('INSERT INTO orders (user_id, total, payment_screenshot) VALUES (?, ?, ?)')
-      .run(req.session.user.id, total, req.file ? `/uploads/payments/${req.file.filename}` : null);
-    const orderId = orderResult.lastInsertRowid;
-    const stmt = db.prepare('INSERT INTO order_items (order_id, book_id, quantity, price) VALUES (?, ?, ?, ?)');
-    sanitized.forEach((i) => stmt.run(orderId, i.bookId, i.quantity, i.price));
-    return orderId;
-  });
-
-  const orderId = orderTx();
-  res.json({ message: 'Order placed and pending admin approval.', orderId });
+  const order = await Order.create({ user_id: req.session.user.id, total, payment_screenshot: req.file ? `/uploads/payments/${req.file.filename}` : null, items: sanitized });
+  res.json({ message: 'Order placed and pending admin approval.', orderId: order._id });
 });
 
-app.get('/api/my-library', isAuth, (req, res) => {
+app.get('/api/my-library', isAuth, async (req, res) => {
   if (req.session.user.role !== 'user') return res.status(403).json({ error: 'Only users can access library' });
-
-  const books = db
-    .prepare(`
-      SELECT b.id, b.title, b.author, b.pdf_path, o.status, o.created_at
-      FROM orders o
-      JOIN order_items oi ON oi.order_id = o.id
-      JOIN books b ON b.id = oi.book_id
-      WHERE o.user_id = ? AND o.status = 'approved'
-      ORDER BY o.created_at DESC
-    `)
-    .all(req.session.user.id);
+  const orders = await Order.find({ user_id: req.session.user.id, status: 'approved' }).populate('items.book_id').sort({ createdAt: -1 }).lean();
+  const books = orders.flatMap((o) => o.items.map((i) => i.book_id ? ({ id: i.book_id._id, title: i.book_id.title, author: i.book_id.author, pdf_path: i.book_id.pdf_path, status: o.status, created_at: o.createdAt }) : null).filter(Boolean));
   res.json(books);
 });
 
-app.get('/api/admin/dashboard', isAuth, isAdmin, (_, res) => {
-  const users = db.prepare('SELECT id, name, email, role, created_at FROM users ORDER BY id DESC').all();
-  const books = db.prepare('SELECT * FROM books ORDER BY id DESC').all();
-  const orders = db
-    .prepare(`
-      SELECT o.*, u.name as user_name, u.email as user_email
-      FROM orders o JOIN users u ON u.id = o.user_id ORDER BY o.id DESC
-    `)
-    .all();
-  const testimonials = db.prepare('SELECT * FROM testimonials ORDER BY id DESC').all();
-  const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get();
-  res.json({ users, books, orders, testimonials, settings });
+app.get('/api/admin/dashboard', isAuth, isAdmin, async (_, res) => {
+  const users = await User.find({}, { name: 1, email: 1, role: 1, createdAt: 1 }).sort({ createdAt: -1 }).lean();
+  const books = await Book.find({}).sort({ createdAt: -1 }).lean();
+  const orders = await Order.find({}).populate('user_id').sort({ createdAt: -1 }).lean();
+  const testimonials = await Testimonial.find({}).sort({ createdAt: -1 }).lean();
+  const settings = await Settings.findOne().lean();
+
+  res.json({
+    users: users.map((u) => ({ id: u._id, name: u.name, email: u.email, role: u.role, created_at: u.createdAt })),
+    books,
+    orders: orders.map((o) => ({ ...o, id: o._id, user_name: o.user_id?.name || 'Unknown', user_email: o.user_id?.email || '-' })),
+    testimonials,
+    settings
+  });
 });
 
-app.post('/api/admin/books', isAuth, isAdmin, uploadBook.single('pdf'), (req, res) => {
+app.post('/api/admin/books', isAuth, isAdmin, uploadBook.single('pdf'), async (req, res) => {
   const { title, author, description, price, cover_url } = req.body;
   if (!title || !author || !price || !req.file) return res.status(400).json({ error: 'Title, author, price and PDF are required' });
-  db.prepare('INSERT INTO books (title, author, description, price, cover_url, pdf_path) VALUES (?, ?, ?, ?, ?, ?)').run(
-    title,
-    author,
-    description || '',
-    Number(price),
-    cover_url || '',
-    `/uploads/books/${req.file.filename}`
-  );
+  await Book.create({ title, author, description: description || '', price: Number(price), cover_url: cover_url || '', pdf_path: `/uploads/books/${req.file.filename}` });
   res.json({ message: 'Book added successfully' });
 });
+app.put('/api/admin/books/:id', isAuth, isAdmin, async (req, res) => { const { title, author, description, price, cover_url } = req.body; await Book.findByIdAndUpdate(req.params.id, { title, author, description: description || '', price: Number(price), cover_url: cover_url || '' }); res.json({ message: 'Book updated' }); });
+app.delete('/api/admin/books/:id', isAuth, isAdmin, async (req, res) => { await Book.findByIdAndDelete(req.params.id); res.json({ message: 'Book deleted' }); });
 
-app.put('/api/admin/books/:id', isAuth, isAdmin, (req, res) => {
-  const { title, author, description, price, cover_url } = req.body;
-  db.prepare('UPDATE books SET title=?, author=?, description=?, price=?, cover_url=? WHERE id=?').run(
-    title,
-    author,
-    description || '',
-    Number(price),
-    cover_url || '',
-    Number(req.params.id)
-  );
-  res.json({ message: 'Book updated' });
-});
+app.post('/api/admin/testimonials', isAuth, isAdmin, async (req, res) => { const { name, content, rating } = req.body; await Testimonial.create({ name, content, rating: Number(rating || 5) }); res.json({ message: 'Testimonial added' }); });
+app.put('/api/admin/testimonials/:id', isAuth, isAdmin, async (req, res) => { const { name, content, rating } = req.body; await Testimonial.findByIdAndUpdate(req.params.id, { name, content, rating: Number(rating || 5) }); res.json({ message: 'Testimonial updated' }); });
+app.delete('/api/admin/testimonials/:id', isAuth, isAdmin, async (req, res) => { await Testimonial.findByIdAndDelete(req.params.id); res.json({ message: 'Testimonial removed' }); });
 
-app.delete('/api/admin/books/:id', isAuth, isAdmin, (req, res) => {
-  db.prepare('DELETE FROM books WHERE id=?').run(Number(req.params.id));
-  res.json({ message: 'Book deleted' });
-});
+app.put('/api/admin/orders/:id/status', isAuth, isAdmin, async (req, res) => { const { status } = req.body; if (!['approved', 'rejected', 'pending'].includes(status)) return res.status(400).json({ error: 'Invalid status' }); await Order.findByIdAndUpdate(req.params.id, { status }); res.json({ message: `Order ${status}` }); });
+app.put('/api/admin/users/:id/role', isAuth, isAdmin, async (req, res) => { const { role } = req.body; if (!['user', 'admin'].includes(role)) return res.status(400).json({ error: 'Invalid role' }); await User.findByIdAndUpdate(req.params.id, { role }); res.json({ message: 'User role updated' }); });
 
-app.post('/api/admin/testimonials', isAuth, isAdmin, (req, res) => {
-  const { name, content, rating } = req.body;
-  db.prepare('INSERT INTO testimonials (name, content, rating) VALUES (?, ?, ?)').run(name, content, Number(rating || 5));
-  res.json({ message: 'Testimonial added' });
-});
-
-app.put('/api/admin/testimonials/:id', isAuth, isAdmin, (req, res) => {
-  const { name, content, rating } = req.body;
-  db.prepare('UPDATE testimonials SET name=?, content=?, rating=?, updated_at=CURRENT_TIMESTAMP WHERE id=?').run(
-    name,
-    content,
-    Number(rating || 5),
-    Number(req.params.id)
-  );
-  res.json({ message: 'Testimonial updated' });
-});
-
-app.delete('/api/admin/testimonials/:id', isAuth, isAdmin, (req, res) => {
-  db.prepare('DELETE FROM testimonials WHERE id=?').run(Number(req.params.id));
-  res.json({ message: 'Testimonial removed' });
-});
-
-app.put('/api/admin/orders/:id/status', isAuth, isAdmin, (req, res) => {
-  const { status } = req.body;
-  if (!['approved', 'rejected', 'pending'].includes(status)) return res.status(400).json({ error: 'Invalid status' });
-  db.prepare('UPDATE orders SET status=? WHERE id=?').run(status, Number(req.params.id));
-  res.json({ message: `Order ${status}` });
-});
-
-app.put('/api/admin/users/:id/role', isAuth, isAdmin, (req, res) => {
-  const { role } = req.body;
-  if (!['user', 'admin'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
-  db.prepare('UPDATE users SET role=? WHERE id=?').run(role, Number(req.params.id));
-  res.json({ message: 'User role updated' });
-});
-
-app.post('/api/admin/settings/qr', isAuth, isAdmin, uploadQR.single('qr'), (req, res) => {
+app.post('/api/admin/settings/qr', isAuth, isAdmin, uploadQR.single('qr'), async (req, res) => {
   const { upi_id } = req.body;
-  db.prepare('UPDATE settings SET upi_qr_path=?, upi_id=? WHERE id=1').run(
-    req.file ? `/uploads/qr/${req.file.filename}` : db.prepare('SELECT upi_qr_path FROM settings WHERE id=1').get().upi_qr_path,
-    upi_id || ''
-  );
+  const current = await Settings.findOne();
+  current.upi_qr_path = req.file ? `/uploads/qr/${req.file.filename}` : current.upi_qr_path;
+  current.upi_id = upi_id || '';
+  await current.save();
   res.json({ message: 'UPI settings updated' });
 });
 
 app.post('/api/contact', async (req, res) => {
   const { name, email, message } = req.body;
   if (!name || !email || !message) return res.status(400).json({ error: 'All fields required' });
-
-  db.prepare('INSERT INTO contact_messages (name, email, message) VALUES (?, ?, ?)').run(name, email, message);
+  await ContactMessage.create({ name, email, message });
 
   if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT || 587),
-      secure: false,
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-    });
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
-      to: 'disamaze@gmail.com',
-      subject: 'ReadifyBySam Contact Message',
-      text: `Name: ${name}\nEmail: ${email}\n\n${message}`
-    });
+    const transporter = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), secure: false, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } });
+    await transporter.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER, to: 'disamaze@gmail.com', subject: 'ReadifyBySam Contact Message', text: `Name: ${name}\nEmail: ${email}\n\n${message}` });
   }
-
   res.json({ message: 'Message sent successfully!' });
 });
 
@@ -362,6 +201,9 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`ReadifyBySam running on port ${PORT}`);
-});
+initMongo()
+  .then(() => app.listen(PORT, () => console.log(`ReadifyBySam running on port ${PORT} with MongoDB`)))
+  .catch((err) => {
+    console.error('Failed to connect MongoDB:', err.message);
+    process.exit(1);
+  });

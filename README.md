@@ -1,15 +1,14 @@
 # ReadifyBySam
 
-Full-stack bookstore + admin dashboard designed for Render deployment.
+Full-stack bookstore + admin dashboard designed for Render deployment with **MongoDB** backend.
 
 ## Features
 - Animated intro loader: `Reading -> begins -> here`.
 - Signup/Login with role selection (user/admin).
-- User storefront with cart and UPI checkout (QR shown from admin settings).
+- Multi-page user experience: Home, Books, Cart/Checkout, Library.
 - Admin dashboard to manage books, testimonials, users, order approvals, and UPI QR.
 - Payment approval workflow: user gets PDF in library after admin approves order.
 - Contact form stores messages and optionally sends email to `disamaze@gmail.com`.
-- Responsive UI with transitions, parallax hero, testimonials, and live purchased-count.
 
 ## Local setup
 ```bash
@@ -19,6 +18,10 @@ npm start
 ```
 Open `http://localhost:10000`.
 
+## Required environment variables
+- `MONGODB_URI` (MongoDB Atlas/local connection string)
+- `SESSION_SECRET`
+
 ## Default admin (seeded)
 - Email: from `DEFAULT_ADMIN_EMAIL`
 - Password: from `DEFAULT_ADMIN_PASSWORD`
@@ -26,7 +29,7 @@ Open `http://localhost:10000`.
 ## Deploy on Render
 1. Push repository to GitHub.
 2. Create a new **Web Service** on Render.
-3. Render auto-detects `render.yaml` or configure:
+3. Configure Build/Start:
    - Build: `npm install`
    - Start: `npm start`
-4. Set environment variables from `.env.example`.
+4. Set env vars from `.env.example` including `MONGODB_URI`.

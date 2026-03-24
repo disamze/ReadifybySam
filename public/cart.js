@@ -26,7 +26,7 @@ async function bootstrap() {
   else {
     let total = 0;
     q('#cart-list').innerHTML = cart.map((item, idx) => {
-      const b = books.find((x) => x.id === item.bookId) || { title: 'Book', price: 0 };
+      const b = books.find((x) => String(x.id || x._id) === String(item.bookId)) || { title: 'Book', price: 0 };
       total += b.price * item.quantity;
       return `<p>${b.title} × ${item.quantity} = ₹${(b.price * item.quantity).toFixed(2)} <button onclick="removeItem(${idx})">Remove</button></p>`;
     }).join('') + `<h4>Total: ₹${total.toFixed(2)}</h4>`;

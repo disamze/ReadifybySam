@@ -30,13 +30,13 @@ async function bootstrap() {
   const books = await api('/api/books');
   q('#books-grid').innerHTML = books.map((b) => `
     <article class="book">
-      <h4>${b.title}</h4>
+      ${b.cover_image_path ? `<img src="${b.cover_image_path}" style="width:100%;max-height:180px;object-fit:cover;border-radius:10px"/>` : ""}<h4>${b.title}</h4>
       <p class="small">${b.author}</p>
       <p>${b.description || ''}</p>
       <p><b>₹${b.price}</b></p>
       <div class="actions-row">
-        <button onclick="addToCart(${b.id})">Add to cart</button>
-        <button class="ghost" onclick="buyNow(${b.id})">Buy now</button>
+        <button onclick="addToCart('${b.id || b._id}')">Add to cart</button>
+        <button class="ghost" onclick="buyNow('${b.id || b._id}')">Buy now</button>
       </div>
     </article>`).join('');
 }

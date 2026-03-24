@@ -44,12 +44,13 @@ async function renderAdmin() {
       <input name="author" placeholder="Author" required />
       <input name="description" placeholder="Description" />
       <input name="price" type="number" step="0.01" placeholder="Price" required />
-      <input name="cover_url" placeholder="Cover URL" />
+      <input name="cover_image" type="file" accept="image/*" required />
+      <input name="preview_pages" type="file" accept="image/*" multiple />
       <input name="pdf" type="file" accept="application/pdf" required />
       <button>Add Book</button>
     </form>
     <h4>Existing Books</h4>
-    ${data.books.map((b) => `<p>${b.title} ₹${b.price} <button onclick="delBook(${b.id})">Delete</button></p>`).join('') || '<p>No books yet.</p>'}
+    ${data.books.map((b) => `<div class="panel"><p>${b.title} ₹${b.price}</p>${b.cover_image_path ? `<img src="${b.cover_image_path}" style="max-width:90px;border-radius:8px"/>` : ''}<p>Preview pages: ${(b.preview_pages || []).length}</p><button onclick="delBook('${b.id || b._id}')">Delete</button></div>`).join('') || '<p>No books yet.</p>'}
   `;
 
   q('#users').innerHTML = `<h3>Users Management</h3>${data.users.map((u) => `<p>${u.name} (${u.email}) role:${u.role} <button onclick="toggleRole(${u.id}, '${u.role === 'admin' ? 'user' : 'admin'}')">Make ${u.role === 'admin' ? 'user' : 'admin'}</button></p>`).join('')}`;

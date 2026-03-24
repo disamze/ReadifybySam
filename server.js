@@ -48,7 +48,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const UserSchema = new mongoose.Schema({ name: String, email: { type: String, unique: true }, password_hash: String, role: { type: String, enum: ['user', 'admin'] } }, { timestamps: true });
 const SettingsSchema = new mongoose.Schema({ site_name: { type: String, default: 'ReadifyBySam' }, upi_qr_path: { type: String, default: '' }, upi_id: { type: String, default: '' } }, { timestamps: true });
-const BookSchema = new mongoose.Schema({ title: String, author: String, description: String, price: Number, cover_url: String, pdf_path: String }, { timestamps: true });
+const BookSchema = new mongoose.Schema({ title: String, author: String, description: String, price: Number, cover_url: String, cover_image_path: String, preview_pages: [String], pdf_path: String }, { timestamps: true });
 const TestimonialSchema = new mongoose.Schema({ name: String, content: String, rating: { type: Number, default: 5 } }, { timestamps: true });
 const OrderSchema = new mongoose.Schema({ user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, total: Number, status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' }, payment_screenshot: String, items: [{ book_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Book' }, quantity: Number, price: Number }] }, { timestamps: true });
 const ContactSchema = new mongoose.Schema({ name: String, email: String, message: String }, { timestamps: true });
@@ -61,9 +61,11 @@ const Order = mongoose.model('Order', OrderSchema);
 const ContactMessage = mongoose.model('ContactMessage', ContactSchema);
 
 const storageBooks = multer.diskStorage({ destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/books')), filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`) });
+const storageBookImages = multer.diskStorage({ destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/books')), filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`) });
 const storagePayments = multer.diskStorage({ destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/payments')), filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`) });
 const storageQR = multer.diskStorage({ destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/qr')), filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`) });
 const uploadBook = multer({ storage: storageBooks });
+const uploadBookImages = multer({ storage: storageBookImages });
 const uploadPayment = multer({ storage: storagePayments });
 const uploadQR = multer({ storage: storageQR });
 
@@ -122,7 +124,7 @@ async function publicStats() {
   const approvedOrders = await Order.find({ status: 'approved' }, { items: 1 });
   const purchased = approvedOrders.reduce((sum, order) => sum + order.items.reduce((acc, i) => acc + i.quantity, 0), 0);
   const testimonials = await Testimonial.find({}, { name: 1, content: 1, rating: 1 }).sort({ createdAt: -1 }).lean();
-  const books = await Book.find({}, { title: 1, author: 1, description: 1, price: 1, cover_url: 1 }).sort({ createdAt: -1 }).lean();
+  const books = await Book.find({}, { title: 1, author: 1, description: 1, price: 1, cover_url: 1, cover_image_path: 1, preview_pages: 1 }).sort({ createdAt: -1 }).lean();
   const settings = await Settings.findOne({}, { site_name: 1, upi_qr_path: 1, upi_id: 1 }).lean();
   return { purchased, testimonials, books, settings };
 }
@@ -147,7 +149,7 @@ app.post('/api/auth/login', async (req, res) => {
 app.post('/api/auth/logout', (req, res) => req.session.destroy(() => res.json({ message: 'Logged out' })));
 app.get('/api/auth/me', (req, res) => res.json({ user: req.session.user || null }));
 
-app.get('/api/books', async (_, res) => res.json(await Book.find({}, { title: 1, author: 1, description: 1, price: 1, cover_url: 1 }).sort({ createdAt: -1 }).lean()));
+app.get('/api/books', async (_, res) => res.json(await Book.find({}, { title: 1, author: 1, description: 1, price: 1, cover_url: 1, cover_image_path: 1, preview_pages: 1 }).sort({ createdAt: -1 }).lean()));
 
 app.post('/api/orders', isAuth, uploadPayment.single('payment_screenshot'), async (req, res) => {
   if (req.session.user.role !== 'user') return res.status(403).json({ error: 'Only users can place orders' });
@@ -187,13 +189,25 @@ app.get('/api/admin/dashboard', isAuth, isAdmin, async (_, res) => {
   res.json({ users: users.map((u) => ({ id: u._id, name: u.name, email: u.email, role: u.role, created_at: u.createdAt })), books, orders: orders.map((o) => ({ ...o, id: o._id, user_name: o.user_id?.name || 'Unknown', user_email: o.user_id?.email || '-' })), testimonials, settings });
 });
 
-app.post('/api/admin/books', isAuth, isAdmin, uploadBook.single('pdf'), async (req, res) => {
-  const { title, author, description, price, cover_url } = req.body;
-  if (!title || !author || !price || !req.file) return res.status(400).json({ error: 'Title, author, price and PDF are required' });
-  await Book.create({ title, author, description: description || '', price: Number(price), cover_url: cover_url || '', pdf_path: `/uploads/books/${req.file.filename}` });
+app.post('/api/admin/books', isAuth, isAdmin, uploadBookImages.fields([{ name: 'cover_image', maxCount: 1 }, { name: 'preview_pages', maxCount: 8 }, { name: 'pdf', maxCount: 1 }]), async (req, res) => {
+  const { title, author, description, price } = req.body;
+  const pdfFile = req.files?.pdf?.[0];
+  const coverFile = req.files?.cover_image?.[0];
+  const previewFiles = req.files?.preview_pages || [];
+  if (!title || !author || !price || !pdfFile) return res.status(400).json({ error: 'Title, author, price and PDF are required' });
+  await Book.create({
+    title,
+    author,
+    description: description || '',
+    price: Number(price),
+    cover_url: '',
+    cover_image_path: coverFile ? `/uploads/books/${coverFile.filename}` : '',
+    preview_pages: previewFiles.map((f) => `/uploads/books/${f.filename}`),
+    pdf_path: `/uploads/books/${pdfFile.filename}`
+  });
   res.json({ message: 'Book added successfully' });
 });
-app.put('/api/admin/books/:id', isAuth, isAdmin, async (req, res) => { const { title, author, description, price, cover_url } = req.body; await Book.findByIdAndUpdate(req.params.id, { title, author, description: description || '', price: Number(price), cover_url: cover_url || '' }); res.json({ message: 'Book updated' }); });
+app.put('/api/admin/books/:id', isAuth, isAdmin, async (req, res) => { const { title, author, description, price } = req.body; await Book.findByIdAndUpdate(req.params.id, { title, author, description: description || '', price: Number(price) }); res.json({ message: 'Book updated' }); });
 app.delete('/api/admin/books/:id', isAuth, isAdmin, async (req, res) => { await Book.findByIdAndDelete(req.params.id); res.json({ message: 'Book deleted' }); });
 app.post('/api/admin/testimonials', isAuth, isAdmin, async (req, res) => { const { name, content, rating } = req.body; await Testimonial.create({ name, content, rating: Number(rating || 5) }); res.json({ message: 'Testimonial added' }); });
 app.put('/api/admin/testimonials/:id', isAuth, isAdmin, async (req, res) => { const { name, content, rating } = req.body; await Testimonial.findByIdAndUpdate(req.params.id, { name, content, rating: Number(rating || 5) }); res.json({ message: 'Testimonial updated' }); });

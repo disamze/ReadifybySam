@@ -4,17 +4,27 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ReadifyBySam</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Sora:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
+  <canvas id="bg-canvas"></canvas>
+
   <div id="loader" class="loader">
-    <h1 id="loader-word">Reading</h1>
+    <div class="loader-card">
+      <p class="loader-tag">✨ Welcome to</p>
+      <h1 class="brand">ReadifyBySam</h1>
+      <h2 id="loader-word" class="loader-word">Reading</h2>
+      <div class="loader-track"><span id="loader-fill"></span></div>
+    </div>
   </div>
 
   <div id="auth-screen" class="center-screen hidden">
     <div class="glass card">
-      <h2>Welcome to ReadifyBySam</h2>
-      <p>Reading begins here.</p>
+      <h2>Start your learning journey</h2>
+      <p class="muted">Create account or login to continue.</p>
       <form id="auth-form">
         <input id="name" placeholder="Full Name" />
         <input id="email" type="email" placeholder="Email" required />
@@ -25,10 +35,10 @@
         </div>
         <div class="toggle-row">
           <button type="button" id="signup-btn">Signup</button>
-          <button type="button" id="login-btn">Login</button>
+          <button type="button" id="login-btn" class="ghost">Login</button>
         </div>
       </form>
-      <p id="auth-msg"></p>
+      <p id="auth-msg" class="status"></p>
     </div>
   </div>
 
@@ -36,29 +46,30 @@
     <header class="hero parallax">
       <nav>
         <h1>ReadifyBySam</h1>
-        <div>
+        <div class="nav-right">
           <span id="welcome"></span>
           <button id="logout-btn">Logout</button>
         </div>
       </nav>
       <div class="hero-content">
-        <h2>Trusted Digital Learning Store</h2>
-        <p>Buy books, grow skills, and access your approved library instantly.</p>
+        <p class="hero-chip">Trusted by ambitious learners</p>
+        <h2>Reading begins here.</h2>
+        <p>Premium books, smooth purchases, secure approvals, and beautiful reading experience.</p>
       </div>
     </header>
 
     <main id="user-view" class="hidden"></main>
     <main id="admin-view" class="hidden"></main>
 
-    <section id="contact" class="section">
+    <section id="contact" class="section wide contact-shell">
       <h3>Contact Us</h3>
       <form id="contact-form" class="contact-form">
         <input id="cname" placeholder="Your name" required />
         <input id="cemail" type="email" placeholder="Your email" required />
         <textarea id="cmessage" placeholder="Your message" required></textarea>
-        <button>Send</button>
+        <button>Send Message</button>
       </form>
-      <p id="contact-msg"></p>
+      <p id="contact-msg" class="status"></p>
     </section>
 
     <footer>

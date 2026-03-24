@@ -1,17 +1,64 @@
 const q = (s) => document.querySelector(s);
 const loaderWord = q('#loader-word');
+const loaderFill = q('#loader-fill');
 const loader = q('#loader');
 const words = ['Reading', 'begins', 'here'];
 let i = 0;
-const wi = setInterval(() => {
-  i = (i + 1) % words.length;
-  loaderWord.textContent = words[i];
-}, 1400);
+
+function initBackgroundParticles() {
+  const canvas = q('#bg-canvas');
+  const ctx = canvas.getContext('2d');
+  const points = [];
+  const count = 65;
+
+  function resize() {
+    canvas.width = innerWidth;
+    canvas.height = innerHeight;
+  }
+  resize();
+  addEventListener('resize', resize);
+
+  for (let p = 0; p < count; p++) {
+    points.push({
+      x: Math.random() * innerWidth,
+      y: Math.random() * innerHeight,
+      vx: (Math.random() - 0.5) * 0.45,
+      vy: (Math.random() - 0.5) * 0.45,
+      r: Math.random() * 2.2 + 0.5
+    });
+  }
+
+  function tick() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const p of points) {
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+      if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+      ctx.beginPath();
+      ctx.fillStyle = 'rgba(186,230,253,0.55)';
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    requestAnimationFrame(tick);
+  }
+  tick();
+}
+initBackgroundParticles();
+
+const loaderInterval = setInterval(() => {
+  i += 1;
+  loaderWord.textContent = words[i % words.length];
+  loaderFill.style.width = `${Math.min(100, (i / (words.length + 1)) * 100)}%`;
+}, 1200);
+
 setTimeout(() => {
-  clearInterval(wi);
-  loader.classList.add('hidden');
+  clearInterval(loaderInterval);
+  loaderFill.style.width = '100%';
+  loader.style.opacity = '0';
+  loader.style.visibility = 'hidden';
   q('#auth-screen').classList.remove('hidden');
-}, 4500);
+}, 4800);
 
 q('#year').textContent = new Date().getFullYear();
 const cart = new Map();
@@ -37,7 +84,7 @@ q('#signup-btn').onclick = async () => {
     await api('/api/auth/signup', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(authValues())
     });
-    q('#auth-msg').textContent = 'Signup done. Login now.';
+    q('#auth-msg').textContent = 'Signup done ✅ Please login now.';
   } catch (e) { q('#auth-msg').textContent = e.message; }
 };
 
@@ -66,34 +113,34 @@ async function renderUser() {
   const library = await api('/api/my-library').catch(() => []);
 
   el.innerHTML = `
-    <section class="section">
-      <h3>Books</h3>
+    <section class="section wide">
+      <h3>Discover Books</h3>
       <div class="grid">
         ${data.books.map((b) => `
           <article class="book">
             <h4>${b.title}</h4>
-            <p class="small">${b.author}</p>
+            <p class="small">by ${b.author}</p>
             <p>${b.description || ''}</p>
             <p><b>₹${b.price}</b></p>
             <button onclick="addToCart(${b.id})">Add to cart</button>
           </article>
-        `).join('')}
+        `).join('') || '<p>No books available yet.</p>'}
       </div>
     </section>
-    <section class="section panel">
+    <section class="section wide panel">
       <h3>Cart & UPI checkout</h3>
-      ${data.settings.upi_qr_path ? `<img src="${data.settings.upi_qr_path}" alt="UPI QR" style="max-width:180px;border-radius:10px"/>` : '<p>No QR uploaded by admin.</p>'}
-      <p>UPI ID: ${data.settings.upi_id || 'Not set'}</p>
+      ${data.settings.upi_qr_path ? `<img src="${data.settings.upi_qr_path}" alt="UPI QR" style="max-width:210px;border-radius:12px"/>` : '<p>No QR uploaded by admin.</p>'}
+      <p>UPI ID: <b>${data.settings.upi_id || 'Not set'}</b></p>
       <div id="cart-list"></div>
       <input id="payment-proof" type="file" accept="image/*" />
       <button onclick="checkout()">Place order (Pending admin approval)</button>
     </section>
-    <section class="section">
-      <h3>Purchased by students: ${data.purchased}</h3>
-      <h3>Testimonials</h3>
+    <section class="section wide">
+      <h3>Books purchased by students: ${data.purchased}</h3>
+      <h3>Learner Testimonials</h3>
       <div class="grid">${data.testimonials.map(t => `<div class="panel"><b>${t.name}</b><p>${t.content}</p><small>${'⭐'.repeat(t.rating)}</small></div>`).join('')}</div>
     </section>
-    <section class="section">
+    <section class="section wide">
       <h3>My Approved Library</h3>
       <div class="grid">${library.map(b => `<div class="panel"><b>${b.title}</b><p>${b.author}</p><a href="${b.pdf_path}" target="_blank">Open PDF</a></div>`).join('') || '<p>No approved books yet.</p>'}</div>
     </section>
@@ -139,11 +186,11 @@ async function renderAdmin() {
   el.classList.remove('hidden');
   const data = await api('/api/admin/dashboard');
   el.innerHTML = `
-    <section class="section grid">
+    <section class="section wide grid">
       <div class="panel"><h3>Users</h3>${data.users.map(u => `<p>${u.name} (${u.role}) <button onclick="toggleRole(${u.id}, '${u.role === 'admin' ? 'user' : 'admin'}')">Make ${u.role === 'admin' ? 'user' : 'admin'}</button></p>`).join('')}</div>
       <div class="panel"><h3>Orders</h3>${data.orders.map(o => `<p>#${o.id} ${o.user_name} ₹${o.total} [${o.status}] ${o.payment_screenshot ? `<a href="${o.payment_screenshot}" target="_blank">proof</a>` : ''} <button onclick="setOrder(${o.id}, 'approved')">Approve</button> <button onclick="setOrder(${o.id}, 'rejected')">Reject</button></p>`).join('')}</div>
     </section>
-    <section class="section panel">
+    <section class="section wide panel">
       <h3>Add Book (PDF upload)</h3>
       <form id="book-form">
         <input name="title" placeholder="Title" required />
@@ -157,16 +204,16 @@ async function renderAdmin() {
       <h4>Manage Books</h4>
       ${data.books.map(b => `<p>${b.title} ₹${b.price} <button onclick="delBook(${b.id})">Delete</button></p>`).join('')}
     </section>
-    <section class="section panel">
+    <section class="section wide panel">
       <h3>UPI QR Settings</h3>
-      ${data.settings.upi_qr_path ? `<img src="${data.settings.upi_qr_path}" style="max-width:180px;border-radius:10px" />` : ''}
+      ${data.settings.upi_qr_path ? `<img src="${data.settings.upi_qr_path}" style="max-width:220px;border-radius:12px" />` : ''}
       <form id="qr-form">
         <input name="upi_id" value="${data.settings.upi_id || ''}" placeholder="UPI ID" />
         <input name="qr" type="file" accept="image/*" />
         <button>Update UPI</button>
       </form>
     </section>
-    <section class="section panel">
+    <section class="section wide panel">
       <h3>Testimonials</h3>
       <form id="test-form">
         <input name="name" placeholder="Name" required />
@@ -211,7 +258,7 @@ q('#contact-form').onsubmit = async (e) => {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: q('#cname').value, email: q('#cemail').value, message: q('#cmessage').value })
     });
-    q('#contact-msg').textContent = 'Message sent to disamaze@gmail.com';
+    q('#contact-msg').textContent = 'Message sent to disamaze@gmail.com ✅';
     e.target.reset();
   } catch (err) { q('#contact-msg').textContent = err.message; }
 };

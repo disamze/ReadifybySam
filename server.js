@@ -7,9 +7,14 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const nodemailer = require('nodemailer');
 const mongoose = require('mongoose');
+const MongoStore = require('connect-mongo');
+const MemoryStoreFactory = require('memorystore');
 
 const app = express();
-const PORT = process.env.PORT || 10000;
+const PORT = Number(process.env.PORT) || 10000;
+const MemoryStore = MemoryStoreFactory(session);
+const MONGODB_URI = process.env.MONGODB_URI;
+let dbReady = false;
 
 ['uploads/books', 'uploads/payments', 'uploads/qr'].forEach((dir) => {
   const full = path.join(__dirname, dir);
@@ -18,14 +23,26 @@ const PORT = process.env.PORT || 10000;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || 'readify-secret-key',
-    resave: false,
-    saveUninitialized: false,
-    cookie: { maxAge: 1000 * 60 * 60 * 24 }
-  })
-);
+
+const sessionConfig = {
+  secret: process.env.SESSION_SECRET || 'readify-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 1000 * 60 * 60 * 24 }
+};
+
+if (MONGODB_URI) {
+  sessionConfig.store = MongoStore.create({
+    mongoUrl: MONGODB_URI,
+    ttl: 60 * 60 * 24,
+    autoRemove: 'native'
+  });
+} else {
+  sessionConfig.store = new MemoryStore({ checkPeriod: 1000 * 60 * 60 * 4 });
+  console.warn('MONGODB_URI missing: using fallback memory session store (development-only).');
+}
+
+app.use(session(sessionConfig));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -43,11 +60,18 @@ const Testimonial = mongoose.model('Testimonial', TestimonialSchema);
 const Order = mongoose.model('Order', OrderSchema);
 const ContactMessage = mongoose.model('ContactMessage', ContactSchema);
 
-async function initMongo() {
-  const uri = process.env.MONGODB_URI;
-  if (!uri) throw new Error('MONGODB_URI is required');
-  await mongoose.connect(uri);
+const storageBooks = multer.diskStorage({ destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/books')), filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`) });
+const storagePayments = multer.diskStorage({ destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/payments')), filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`) });
+const storageQR = multer.diskStorage({ destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/qr')), filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`) });
+const uploadBook = multer({ storage: storageBooks });
+const uploadPayment = multer({ storage: storagePayments });
+const uploadQR = multer({ storage: storageQR });
 
+const isAuth = (req, res, next) => (req.session.user ? next() : res.status(401).json({ error: 'Unauthorized' }));
+const isAdmin = (req, res, next) => (req.session.user?.role === 'admin' ? next() : res.status(403).json({ error: 'Forbidden' }));
+const requireDb = (_, res, next) => (dbReady ? next() : res.status(503).json({ error: 'Database initializing. Try again shortly.' }));
+
+async function seedMongo() {
   const adminEmail = (process.env.DEFAULT_ADMIN_EMAIL || 'admin@readifybysam.com').toLowerCase();
   const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD || 'Admin@12345';
   const adminName = process.env.DEFAULT_ADMIN_NAME || 'Readify Admin';
@@ -56,11 +80,10 @@ async function initMongo() {
   if (!existingAdmin) {
     const hash = bcrypt.hashSync(adminPassword, 10);
     await User.create({ name: adminName, email: adminEmail, password_hash: hash, role: 'admin' });
-    console.log(`Seeded admin: ${adminEmail} / ${adminPassword}`);
+    console.log(`Seeded admin: ${adminEmail}`);
   }
 
-  const settings = await Settings.findOne();
-  if (!settings) await Settings.create({});
+  if (!(await Settings.findOne())) await Settings.create({});
 
   if ((await Testimonial.countDocuments()) === 0) {
     await Testimonial.insertMany([
@@ -71,15 +94,29 @@ async function initMongo() {
   }
 }
 
-const storageBooks = multer.diskStorage({ destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/books')), filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`) });
-const storagePayments = multer.diskStorage({ destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/payments')), filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`) });
-const storageQR = multer.diskStorage({ destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/qr')), filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`) });
-const uploadBook = multer({ storage: storageBooks });
-const uploadPayment = multer({ storage: storagePayments });
-const uploadQR = multer({ storage: storageQR });
+async function connectMongoWithRetry() {
+  if (!MONGODB_URI) return;
+  let attempts = 0;
+  while (!dbReady && attempts < 20) {
+    try {
+      attempts += 1;
+      await mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 8000 });
+      await seedMongo();
+      dbReady = true;
+      console.log('MongoDB connected.');
+      return;
+    } catch (err) {
+      console.error(`MongoDB connect attempt ${attempts} failed: ${err.message}`);
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  }
+}
 
-const isAuth = (req, res, next) => (req.session.user ? next() : res.status(401).json({ error: 'Unauthorized' }));
-const isAdmin = (req, res, next) => (req.session.user?.role === 'admin' ? next() : res.status(403).json({ error: 'Forbidden' }));
+app.get('/healthz', (_, res) => {
+  res.status(200).json({ ok: true, dbReady, uptime: process.uptime() });
+});
+
+app.use('/api', requireDb);
 
 async function publicStats() {
   const approvedOrders = await Order.find({ status: 'approved' }, { items: 1 });
@@ -91,7 +128,6 @@ async function publicStats() {
 }
 
 app.get('/api/public-data', async (_, res) => res.json(await publicStats()));
-
 app.post('/api/auth/signup', async (req, res) => {
   const { name, email, password, role } = req.body;
   if (!name || !email || !password || !['user', 'admin'].includes(role)) return res.status(400).json({ error: 'Invalid signup details.' });
@@ -100,7 +136,6 @@ app.post('/api/auth/signup', async (req, res) => {
   await User.create({ name, email: email.toLowerCase(), password_hash: hash, role });
   res.json({ message: 'Signup successful. Please login.' });
 });
-
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
   const user = await User.findOne({ email: (email || '').toLowerCase() });
@@ -131,7 +166,6 @@ app.post('/api/orders', isAuth, uploadPayment.single('payment_screenshot'), asyn
     sanitized.push({ book_id: b._id, quantity, price: b.price });
   }
   if (!sanitized.length) return res.status(400).json({ error: 'No valid books in cart' });
-
   const order = await Order.create({ user_id: req.session.user.id, total, payment_screenshot: req.file ? `/uploads/payments/${req.file.filename}` : null, items: sanitized });
   res.json({ message: 'Order placed and pending admin approval.', orderId: order._id });
 });
@@ -149,14 +183,7 @@ app.get('/api/admin/dashboard', isAuth, isAdmin, async (_, res) => {
   const orders = await Order.find({}).populate('user_id').sort({ createdAt: -1 }).lean();
   const testimonials = await Testimonial.find({}).sort({ createdAt: -1 }).lean();
   const settings = await Settings.findOne().lean();
-
-  res.json({
-    users: users.map((u) => ({ id: u._id, name: u.name, email: u.email, role: u.role, created_at: u.createdAt })),
-    books,
-    orders: orders.map((o) => ({ ...o, id: o._id, user_name: o.user_id?.name || 'Unknown', user_email: o.user_id?.email || '-' })),
-    testimonials,
-    settings
-  });
+  res.json({ users: users.map((u) => ({ id: u._id, name: u.name, email: u.email, role: u.role, created_at: u.createdAt })), books, orders: orders.map((o) => ({ ...o, id: o._id, user_name: o.user_id?.name || 'Unknown', user_email: o.user_id?.email || '-' })), testimonials, settings });
 });
 
 app.post('/api/admin/books', isAuth, isAdmin, uploadBook.single('pdf'), async (req, res) => {
@@ -167,11 +194,9 @@ app.post('/api/admin/books', isAuth, isAdmin, uploadBook.single('pdf'), async (r
 });
 app.put('/api/admin/books/:id', isAuth, isAdmin, async (req, res) => { const { title, author, description, price, cover_url } = req.body; await Book.findByIdAndUpdate(req.params.id, { title, author, description: description || '', price: Number(price), cover_url: cover_url || '' }); res.json({ message: 'Book updated' }); });
 app.delete('/api/admin/books/:id', isAuth, isAdmin, async (req, res) => { await Book.findByIdAndDelete(req.params.id); res.json({ message: 'Book deleted' }); });
-
 app.post('/api/admin/testimonials', isAuth, isAdmin, async (req, res) => { const { name, content, rating } = req.body; await Testimonial.create({ name, content, rating: Number(rating || 5) }); res.json({ message: 'Testimonial added' }); });
 app.put('/api/admin/testimonials/:id', isAuth, isAdmin, async (req, res) => { const { name, content, rating } = req.body; await Testimonial.findByIdAndUpdate(req.params.id, { name, content, rating: Number(rating || 5) }); res.json({ message: 'Testimonial updated' }); });
 app.delete('/api/admin/testimonials/:id', isAuth, isAdmin, async (req, res) => { await Testimonial.findByIdAndDelete(req.params.id); res.json({ message: 'Testimonial removed' }); });
-
 app.put('/api/admin/orders/:id/status', isAuth, isAdmin, async (req, res) => { const { status } = req.body; if (!['approved', 'rejected', 'pending'].includes(status)) return res.status(400).json({ error: 'Invalid status' }); await Order.findByIdAndUpdate(req.params.id, { status }); res.json({ message: `Order ${status}` }); });
 app.put('/api/admin/users/:id/role', isAuth, isAdmin, async (req, res) => { const { role } = req.body; if (!['user', 'admin'].includes(role)) return res.status(400).json({ error: 'Invalid role' }); await User.findByIdAndUpdate(req.params.id, { role }); res.json({ message: 'User role updated' }); });
 
@@ -188,7 +213,6 @@ app.post('/api/contact', async (req, res) => {
   const { name, email, message } = req.body;
   if (!name || !email || !message) return res.status(400).json({ error: 'All fields required' });
   await ContactMessage.create({ name, email, message });
-
   if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
     const transporter = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), secure: false, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } });
     await transporter.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER, to: 'disamaze@gmail.com', subject: 'ReadifyBySam Contact Message', text: `Name: ${name}\nEmail: ${email}\n\n${message}` });
@@ -201,9 +225,7 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-initMongo()
-  .then(() => app.listen(PORT, () => console.log(`ReadifyBySam running on port ${PORT} with MongoDB`)))
-  .catch((err) => {
-    console.error('Failed to connect MongoDB:', err.message);
-    process.exit(1);
-  });
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`ReadifyBySam listening on port ${PORT}`);
+  connectMongoWithRetry();
+});

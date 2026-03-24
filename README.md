@@ -33,3 +33,9 @@ Open `http://localhost:10000`.
    - Build: `npm install`
    - Start: `npm start`
 4. Set env vars from `.env.example` including `MONGODB_URI`.
+
+
+## Production notes
+- App now binds `0.0.0.0:$PORT` immediately so Render detects an open port even while DB is initializing.
+- `GET /healthz` returns service status and Mongo readiness.
+- In production, set `MONGODB_URI` so sessions use Mongo-backed `connect-mongo` store instead of in-memory fallback.

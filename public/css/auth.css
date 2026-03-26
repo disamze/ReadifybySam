@@ -6,49 +6,47 @@ body.auth-body {
   align-items: center;
   min-height: 100vh;
   background:
-    radial-gradient(circle at 15% 15%, rgba(168, 85, 247, .24), transparent 30%),
-    radial-gradient(circle at 85% 10%, rgba(14, 165, 233, .24), transparent 28%),
-    linear-gradient(130deg, #0b1024, #1b295c);
+    radial-gradient(circle at 15% 15%, #e9f1ff 0, transparent 35%),
+    radial-gradient(circle at 85% 8%, #e7fbff 0, transparent 28%),
+    linear-gradient(130deg, #f9fcff, #eff5ff);
 }
 
-.loader { position: fixed; inset: 0; display: grid; place-items: center; z-index: 100; background: linear-gradient(160deg, #05070f, #141d3a); }
-.loader-vibe {
-  background: radial-gradient(circle at 15% 20%, rgba(14, 165, 233, .2), transparent 32%), radial-gradient(circle at 85% 10%, rgba(124, 58, 237, .26), transparent 34%), linear-gradient(130deg, #070a17, #111a35 55%, #131a3f);
-  transition: opacity .35s ease;
-}
+.loader { position: fixed; inset: 0; display: grid; place-items: center; z-index: 100; background: linear-gradient(160deg, #f0f6ff, #e7efff); }
+.loader-vibe { transition: opacity .35s ease; }
+.loader-text { color: #4b5f8e; }
 
 .container {
   position: relative;
   width: min(920px, 95vw);
   height: 560px;
-  background: rgba(255,255,255,.94);
+  background: #fff;
   border-radius: 30px;
-  border: 1px solid rgba(255,255,255,.5);
-  box-shadow: 0 25px 80px rgba(0, 0, 0, .35);
+  border: 1px solid #dce7fb;
+  box-shadow: 0 18px 50px rgba(51,79,129,.12);
   margin: 20px;
   overflow: hidden;
 }
-.form-box { position: absolute; right: 0; width: 50%; height: 100%; background: #fff; display: flex; align-items: center; color: #333; text-align: center; padding: 40px; z-index: 1; transition: 1.8s ease-in-out 1.8s, visibility 0s 1.8s; }
+.form-box { position: absolute; right: 0; width: 50%; height: 100%; background: #fff; display: flex; align-items: center; color: #2a3653; text-align: center; padding: 40px; z-index: 1; transition: 1.8s ease-in-out 1.8s, visibility 0s 1.8s; }
 .container.active .form-box { right: 50%; }
 .form-box.register { visibility: hidden; }
 .container.active .form-box.register { visibility: visible; }
 .auth-panel-form { width: 100%; }
-.container h1 { font-size: 36px; margin: -10px 0; color: #1f2a4d; }
+.container h1 { font-size: 36px; margin: -10px 0; color: #2b3f69; }
 .input-box { position: relative; margin: 24px 0; }
-.input-box input { width: 100%; padding: 13px 20px; background: #eef2ff; border-radius: 10px; border: 1px solid #d6defd; outline: none; font-size: 16px; color: #1e293b; font-weight: 500; margin: 0; }
-.input-box input::placeholder { color: #6b7280; }
-.input-box i { position: absolute; top: 50%; right: 16px; transform: translateY(-50%); color: #64748b; font-size: 19px; }
-.btn { width: 100%; height: 48px; background: linear-gradient(95deg, #5b6df7, #22b7d8); border: none; color: #fff; font-size: 16px; font-weight: 700; border-radius: 10px; box-shadow: 0 10px 22px rgba(61,90,254,.28); }
-.container p { margin: 15px 0; font-size: 14px; color:#4a557a; }
+.input-box input { width: 100%; padding: 13px 44px 13px 14px; background: #f7faff; border-radius: 10px; border: 1px solid #d6e2f5; outline: none; font-size: 16px; color: #1e293b; font-weight: 500; margin: 0; }
+.input-box input::placeholder { color: #8b98b3; }
+.input-box i { position: absolute; top: 50%; right: 14px; transform: translateY(-50%); color: #7285ab; font-size: 19px; }
+.btn { width: 100%; height: 48px; border-radius: 10px; }
+.container p { margin: 15px 0; font-size: 14px; color:#5b6f96; }
 .status { display:none; }
 
-.role-switch { --pill-x: 0%; position: relative; display: grid; grid-template-columns: 1fr 1fr; border: 1px solid rgba(31,42,77,.2); border-radius: 999px; overflow: hidden; margin: .55rem 0; background: rgba(0, 0, 0, .04); }
-.role-pill { position: absolute; top: 3px; left: 3px; width: calc(50% - 6px); height: calc(100% - 6px); border-radius: 999px; background: linear-gradient(95deg, #6d28d9, #0891b2); transform: translateX(var(--pill-x)); transition: transform .25s ease; z-index: 0; }
-.role-btn { position: relative; z-index: 1; margin: 0; padding: .55rem .5rem; border: none; background: transparent; color: #334155; }
+.role-switch { --pill-x: 0%; position: relative; display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #d4def0; border-radius: 999px; overflow: hidden; margin: .55rem 0; background: #f4f8ff; }
+.role-pill { position: absolute; top: 3px; left: 3px; width: calc(50% - 6px); height: calc(100% - 6px); border-radius: 999px; background: linear-gradient(95deg, #5b7cfa, #2db8d9); transform: translateX(var(--pill-x)); transition: transform .25s ease; z-index: 0; }
+.role-btn { position: relative; z-index: 1; margin: 0; padding: .55rem .5rem; border: none; background: transparent; color: #49608f; box-shadow: none; }
 .role-btn.active { color: #fff; font-weight: 700; }
 
 .toggle-box { position: absolute; width: 100%; height: 100%; }
-.toggle-box::before { content: ''; position: absolute; left: -250%; border-radius: 150px; width: 300%; height: 100%; background: linear-gradient(180deg, #5f7ef7, #5c8ff8 40%, #3fc3e5); z-index: 2; transition: 3.6s ease-in-out; }
+.toggle-box::before { content: ''; position: absolute; left: -250%; border-radius: 150px; width: 300%; height: 100%; background: linear-gradient(180deg, #5e7ff8, #4ec6e7); z-index: 2; transition: 3.6s ease-in-out; }
 .container.active .toggle-box::before { left: 50%; }
 .toggle-panel { position: absolute; width: 50%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #fff; z-index: 2; transition: 1.8s ease-in-out; }
 .toggle-panel.toggle-left { left: 0; transition-delay: 1.8s; }
@@ -80,7 +78,6 @@ body.auth-body {
 .book_item:nth-child(4) { animation-delay: 1250ms; }
 .book_item:nth-child(5) { animation-delay: 1666.666ms; }
 .book_item:nth-child(6) { animation-delay: 2083.333ms; }
-
 @keyframes travel {
   0% { opacity: 0; transform: translateX(300px) rotateZ(0deg) scaleY(1); }
   6.5% { transform: translateX(279.5px) rotateZ(0deg) scaleY(1.1); }
@@ -99,8 +96,11 @@ body.auth-body {
 
 @media screen and (max-width: 650px) {
   .container { height: calc(100vh - 40px); }
-  .form-box { width: 100%; height: 70%; bottom: 0; }
-  .container.active .form-box { right: 0; bottom: 30%; }
+  .form-box { right: 0; width: 100%; height: 70%; bottom: 0; transition: bottom .9s ease, visibility 0s .9s; }
+  .form-box.login { bottom: 0; }
+  .form-box.register { bottom: -100%; visibility: hidden; }
+  .container.active .form-box.login { bottom: 100%; visibility: hidden; }
+  .container.active .form-box.register { bottom: 0; visibility: visible; }
   .toggle-box::before { width: 100%; height: 300%; left: 0; top: -270%; border-radius: 20vw; }
   .container.active .toggle-box::before { top: 70%; }
   .toggle-panel { width: 100%; height: 30%; }
@@ -108,14 +108,11 @@ body.auth-body {
   .toggle-panel.toggle-left { top: 0; }
   .container.active .toggle-panel.toggle-left { left: 0; top: -30%; }
   .container.active .toggle-panel.toggle-right { bottom: 0; }
-
-  .bookshelf_wrapper.loader-right,
-  .bookshelf_wrapper.loader-left { left: 50%; }
+  .bookshelf_wrapper.loader-right, .bookshelf_wrapper.loader-left { left: 50%; }
 }
 
-
 .toast-container { position: fixed; top: 22px; right: 22px; z-index: 120; display: grid; gap: 10px; }
-.toast { min-width: 260px; max-width: 340px; padding: 12px 14px; border-radius: 12px; color: #fff; box-shadow: 0 12px 30px rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.25); animation: toastIn .2s ease; }
-.toast.success { background: linear-gradient(100deg, #16a34a, #0891b2); }
-.toast.error { background: linear-gradient(100deg, #dc2626, #b91c1c); }
+.toast { min-width: 260px; max-width: 340px; padding: 12px 14px; border-radius: 12px; color: #fff; box-shadow: 0 12px 30px rgba(0,0,0,.2); border: 1px solid rgba(255,255,255,.45); animation: toastIn .2s ease; }
+.toast.success { background: linear-gradient(100deg, #19a866, #2db8d9); }
+.toast.error { background: linear-gradient(100deg, #de4763, #c32849); }
 @keyframes toastIn { from { opacity:0; transform: translateY(-6px) scale(.98);} to { opacity:1; transform: translateY(0) scale(1);} }

@@ -1,2 +1,4 @@
 @import url('/css/shared.css');
-#upi-box img { max-width:220px; border-radius:12px }
+
+#cart-list p { display:flex; justify-content: space-between; align-items: center; gap: .5rem; }
+#upi-box img { max-width: 230px; border-radius: 12px; border: 1px solid #dce8fb; }

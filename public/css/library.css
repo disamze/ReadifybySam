@@ -1,2 +1,5 @@
 @import url('/css/shared.css');
-#library-grid .panel a { color: #c6f6ff; }
+
+#library-grid .panel h4 { color: #27416f; margin: .2rem 0; }
+#library-grid .panel a { color: #3f63b3; font-weight: 700; text-decoration: none; }
+#library-grid .panel a:hover { text-decoration: underline; }

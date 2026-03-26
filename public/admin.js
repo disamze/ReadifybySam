@@ -2,6 +2,7 @@ const q = (s) => document.querySelector(s);
 q('#year').textContent = new Date().getFullYear();
 const hideLoader = () => { const l = q('#page-loader'); if (!l) return; l.style.opacity = '0'; setTimeout(() => (l.style.display = 'none'), 260); };
 const toastContainer = q('#toast-container');
+let adminBooks = [];
 
 function showToast(message, type = 'success') {
   if (!toastContainer) return;
@@ -44,6 +45,7 @@ q('#logout-btn').onclick = async () => {
 async function renderAdmin() {
   const data = await api('/api/admin/dashboard');
   const settings = data.settings || { upi_qr_path: '', upi_id: '' };
+  adminBooks = data.books || [];
 
   q('#overview').innerHTML = `
     <div class="panel"><h3>${data.users.length}</h3><p>Total Users</p></div>
@@ -67,10 +69,10 @@ async function renderAdmin() {
       <input name="preview_pages" type="file" accept="image/*" multiple />
       <label>Main Book PDF</label>
       <input name="pdf" type="file" accept="application/pdf" required />
-      <button type="submit">Add Book</button>
+      <button type="submit" id="add-book-btn">Add Book</button>
     </form>
     <h4>Existing Books</h4>
-    ${data.books.map((b) => `<div class="panel"><p>${b.title} ₹${b.price}</p>${b.cover_image_path ? `<img src="${b.cover_image_path}" style="max-width:90px;border-radius:8px"/>` : ''}<p>Preview pages: ${(b.preview_pages || []).length}</p><button onclick="delBook('${b.id || b._id}')">Delete</button></div>`).join('') || '<p>No books yet.</p>'}
+    <div id="books-list">${adminBooks.map(bookCard).join('') || '<p>No books yet.</p>'}</div>
   `;
 
   q('#users').innerHTML = `<h3>Users Management</h3>${data.users.map((u) => `<p>${u.name} (${u.email}) role:${u.role} <button onclick="toggleRole('${u.id}', '${u.role === 'admin' ? 'user' : 'admin'}')">Make ${u.role === 'admin' ? 'user' : 'admin'}</button></p>`).join('')}`;
@@ -112,12 +114,19 @@ async function renderAdmin() {
 
   q('#book-form').onsubmit = async (e) => {
     e.preventDefault();
+    const addBookBtn = q('#add-book-btn');
     try {
+      addBookBtn.disabled = true;
+      addBookBtn.textContent = 'Uploading...';
       await api('/api/admin/books', { method: 'POST', body: new FormData(e.target) });
+      await refreshBooksFromDb();
       showToast('Book added successfully.', 'success');
-      renderAdmin();
+      e.target.reset();
     } catch (err) {
       showToast(err.message, 'error');
+    } finally {
+      addBookBtn.disabled = false;
+      addBookBtn.textContent = 'Add Book';
     }
   };
 
@@ -149,9 +158,28 @@ async function renderAdmin() {
   };
 }
 
-window.delBook = async (id) => { try { await api(`/api/admin/books/${id}`, { method: 'DELETE' }); showToast('Book deleted.', 'success'); renderAdmin(); } catch (err) { showToast(err.message, 'error'); } };
+window.delBook = async (id) => {
+  try {
+    await api(`/api/admin/books/${id}`, { method: 'DELETE' });
+    await refreshBooksFromDb();
+    showToast('Book deleted.', 'success');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
 window.setOrder = async (id, status) => { try { await api(`/api/admin/orders/${id}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) }); showToast(`Order ${status}.`, 'success'); renderAdmin(); } catch (err) { showToast(err.message, 'error'); } };
 window.toggleRole = async (id, role) => { try { await api(`/api/admin/users/${id}/role`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }) }); showToast('User role updated.', 'success'); renderAdmin(); } catch (err) { showToast(err.message, 'error'); } };
 window.delTest = async (id) => { try { await api(`/api/admin/testimonials/${id}`, { method: 'DELETE' }); showToast('Testimonial deleted.', 'success'); renderAdmin(); } catch (err) { showToast(err.message, 'error'); } };
+
+function bookCard(b) {
+  return `<div class="panel"><p>${b.title} ₹${b.price}</p>${b.cover_image_path ? `<img src="${b.cover_image_path}" style="max-width:90px;border-radius:8px"/>` : ''}<p>Preview pages: ${(b.preview_pages || []).length}</p><button onclick="delBook('${b.id || b._id}')">Delete</button></div>`;
+}
+
+async function refreshBooksFromDb() {
+  const dbBooks = await api('/api/books');
+  adminBooks = dbBooks || [];
+  const list = q('#books-list');
+  if (list) list.innerHTML = adminBooks.map(bookCard).join('') || '<p>No books yet.</p>';
+}
 
 bootstrap();

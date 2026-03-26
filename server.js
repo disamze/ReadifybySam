@@ -272,7 +272,7 @@ app.post('/api/admin/books', isAuth, isAdmin, uploadBookImages.fields([{ name: '
       return res.status(400).json({ error: 'Please enter a valid price greater than 0.' });
     }
 
-    await Book.create({
+    const createdBook = await Book.create({
       title: String(title).trim(),
       author: String(author).trim(),
       description: description ? String(description).trim() : '',
@@ -282,7 +282,7 @@ app.post('/api/admin/books', isAuth, isAdmin, uploadBookImages.fields([{ name: '
       preview_pages: previewFiles.map((f) => `/uploads/books/${f.filename}`),
       pdf_path: `/uploads/books/${pdfFile.filename}`
     });
-    res.json({ message: 'Book added successfully' });
+    res.json({ message: 'Book added successfully', book: createdBook });
   } catch (err) {
     console.error('Book upload failed:', err.message);
     res.status(500).json({ error: 'Book upload failed. Please try again.' });

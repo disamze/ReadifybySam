@@ -1,0 +1,14 @@
+@import url('/css/shared.css');
+.book-anim { position: relative; margin-top: 1.2rem; min-height: 280px; perspective: 900px; display: grid; place-items: center }
+.book-left,.book-right { position: absolute; width: 220px; height: 260px; border-radius: 10px; background: linear-gradient(160deg, #2d3f84, #182448); border: 1px solid rgba(255,255,255,.2); transition: transform 1s ease; }
+.book-left { transform-origin: right center; transform: rotateY(-12deg) translateX(-40px) }
+.book-right { transform-origin: left center; transform: rotateY(12deg) translateX(40px) }
+.book-content { max-width: 720px; opacity: 0; transform: translateY(20px) scale(.97); transition: all .8s ease .4s; padding: 1.3rem; border-radius: 16px; background: rgba(10, 17, 42, .58); border: 1px solid rgba(255,255,255,.12) }
+.book-anim.open .book-left { transform: rotateY(-70deg) translateX(-120px) }
+.book-anim.open .book-right { transform: rotateY(70deg) translateX(120px) }
+.book-anim.open .book-content { opacity: 1; transform: translateY(0) scale(1) }
+.hero-actions { display:flex; justify-content:center; gap:.8rem; margin-top:1rem; flex-wrap:wrap }
+.btn-link { padding:.6rem 1rem; border-radius:10px; background: linear-gradient(95deg, #6d28d9, #0891b2); text-decoration:none; color:#fff }
+.btn-link.ghost { background: rgba(255,255,255,.2) }
+.contact-shell { border:1px solid rgba(255,255,255,.13); border-radius:16px; background: rgba(255,255,255,.05) }
+.contact-form textarea { min-height: 130px }

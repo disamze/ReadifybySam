@@ -130,6 +130,26 @@ async function publicStats() {
 }
 
 app.get('/api/public-data', async (_, res) => res.json(await publicStats()));
+app.get('/api/recent-purchases', async (_, res) => {
+  const orders = await Order.find({ status: 'approved' })
+    .sort({ createdAt: -1 })
+    .limit(30)
+    .populate('user_id', 'name')
+    .populate('items.book_id', 'title')
+    .lean();
+
+  const events = [];
+  orders.forEach((order) => {
+    const buyer = order.user_id?.name || 'A Reader';
+    order.items.forEach((item) => {
+      const title = item.book_id?.title;
+      if (title) events.push({ buyer, title, at: order.createdAt });
+    });
+  });
+
+  res.json(events.slice(0, 30));
+});
+
 app.post('/api/auth/signup', async (req, res) => {
   const { name, email, password, role } = req.body;
   if (!name || !email || !password || !['user', 'admin'].includes(role)) return res.status(400).json({ error: 'Invalid signup details.' });
@@ -229,10 +249,17 @@ app.post('/api/contact', async (req, res) => {
   if (!name || !email || !message) return res.status(400).json({ error: 'All fields required' });
   await ContactMessage.create({ name, email, message });
   if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-    const transporter = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), secure: false, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } });
-    await transporter.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER, to: 'disamaze@gmail.com', subject: 'ReadifyBySam Contact Message', text: `Name: ${name}\nEmail: ${email}\n\n${message}` });
+    try {
+      const transporter = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), secure: false, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } });
+      await transporter.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER, to: 'disamaze@gmail.com', subject: 'ReadifyBySam Contact Message', text: `Name: ${name}
+Email: ${email}
+
+${message}` });
+    } catch (err) {
+      console.error('Contact email send failed:', err.message);
+    }
   }
-  res.json({ message: 'Message sent successfully!' });
+  res.json({ message: 'Message received! We will get back to you soon.' });
 });
 
 app.get('*', (req, res) => {

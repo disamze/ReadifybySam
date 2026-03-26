@@ -7,9 +7,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Sora:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/css/user.css" />
 </head>
 <body>
+  <div id="page-loader" class="page-loader user-loader"><div class="loader-orb"></div><p>Preparing your bookstore...</p></div>
   <div class="sticky-nav">
     <div class="nav-inner">
       <h1>ReadifyBySam</h1>
@@ -32,7 +33,7 @@
         <div class="book-right"></div>
         <div class="book-content">
           <h2>Reading begins here.</h2>
-          <p>As the book opens, your learning journey starts. Premium books, secure payment approvals, and instant library access after admin confirmation.</p>
+          <p>Premium books, smooth checkout, and instant library access after approval.</p>
           <div class="hero-actions">
             <a class="btn-link" href="/books.html">Explore Books</a>
             <a class="btn-link ghost" href="/cart.html">Go to Cart</a>
@@ -42,7 +43,38 @@
     </div>
   </section>
 
+  <section class="section wide">
+    <h3>Trending Books</h3>
+    <div class="book-slider-shell">
+      <div id="book-slider" class="book-slider-track"></div>
+    </div>
+  </section>
+
+  <section class="section wide">
+    <h3>Live Purchasers</h3>
+    <div class="live-box"><p id="purchase-ticker">Loading recent purchases...</p></div>
+  </section>
+
   <section id="stats" class="section wide grid"></section>
+
+  <section class="section wide review-shell">
+    <h3>Share Your Review</h3>
+    <form id="review-form" class="review-form">
+      <textarea id="review-content" placeholder="Write your review about purchased books" required></textarea>
+      <div class="review-actions">
+        <select id="review-rating">
+          <option value="5">5 - Excellent</option>
+          <option value="4">4 - Great</option>
+          <option value="3">3 - Good</option>
+          <option value="2">2 - Fair</option>
+          <option value="1">1 - Poor</option>
+        </select>
+        <button type="submit">Post Review</button>
+      </div>
+    </form>
+    <p id="review-msg" class="status"></p>
+  </section>
+
   <section id="testimonials" class="section wide"></section>
 
   <section id="contact" class="section wide contact-shell">

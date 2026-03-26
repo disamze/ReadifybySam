@@ -1,0 +1,11 @@
+@import url('/css/shared.css');
+
+.page-loader.library-loader { background:#f6faff; }
+.loader-dots { display:flex; gap:6px; margin-bottom: 8px; }
+.loader-dots span { width:10px; height:10px; border-radius:50%; background:#5b7cfa; animation: pulse 1s ease-in-out infinite; }
+.loader-dots span:nth-child(2){animation-delay:.2s}.loader-dots span:nth-child(3){animation-delay:.4s}
+@keyframes pulse {0%,100%{opacity:.35; transform:scale(.8)}50%{opacity:1; transform:scale(1)}}
+
+#library-grid .panel h4 { color: #27416f; margin: .2rem 0; }
+#library-grid .panel a { color: #3f63b3; font-weight: 700; text-decoration: none; }
+#library-grid .panel a:hover { text-decoration: underline; }

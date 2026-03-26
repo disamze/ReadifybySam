@@ -4,9 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ReadifyBySam | Cart & Checkout</title>
-  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/css/cart.css" />
 </head>
 <body>
+  <div id="page-loader" class="page-loader cart-loader"><div class="loader-cart">🛒</div><p>Preparing checkout...</p></div>
   <div class="sticky-nav"><div class="nav-inner"><h1>ReadifyBySam</h1><nav><a href="/user.html">Home</a><a href="/books.html">Books</a><a href="/library.html">Library</a><a href="/cart.html" class="cart-link">🛒 Cart</a></nav><div class="nav-right"><span id="welcome"></span><button id="logout-btn">Logout</button></div></div></div>
   <section class="section wide"><h2>Cart & Checkout</h2><div id="cart-list" class="panel"></div></section>
   <section class="section wide panel"><h3>Checkout</h3><div id="upi-box"></div><input id="payment-proof" type="file" accept="image/*" /><button id="checkout-btn">Submit Order</button></section>

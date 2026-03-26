@@ -130,6 +130,26 @@ async function publicStats() {
 }
 
 app.get('/api/public-data', async (_, res) => res.json(await publicStats()));
+app.get('/api/recent-purchases', async (_, res) => {
+  const orders = await Order.find({ status: 'approved' })
+    .sort({ createdAt: -1 })
+    .limit(30)
+    .populate('user_id', 'name')
+    .populate('items.book_id', 'title')
+    .lean();
+
+  const events = [];
+  orders.forEach((order) => {
+    const buyer = order.user_id?.name || 'A Reader';
+    order.items.forEach((item) => {
+      const title = item.book_id?.title;
+      if (title) events.push({ buyer, title, at: order.createdAt });
+    });
+  });
+
+  res.json(events.slice(0, 30));
+});
+
 app.post('/api/auth/signup', async (req, res) => {
   const { name, email, password, role } = req.body;
   if (!name || !email || !password || !['user', 'admin'].includes(role)) return res.status(400).json({ error: 'Invalid signup details.' });
@@ -171,6 +191,24 @@ app.post('/api/orders', isAuth, uploadPayment.single('payment_screenshot'), asyn
   if (!sanitized.length) return res.status(400).json({ error: 'No valid books in cart' });
   const order = await Order.create({ user_id: req.session.user.id, total, payment_screenshot: req.file ? `/uploads/payments/${req.file.filename}` : null, items: sanitized });
   res.json({ message: 'Order placed and pending admin approval.', orderId: order._id });
+});
+
+
+app.post('/api/user/testimonials', isAuth, async (req, res) => {
+  if (req.session.user.role !== 'user') return res.status(403).json({ error: 'Only users can submit reviews' });
+  const { content, rating } = req.body;
+  if (!content || String(content).trim().length < 8) return res.status(400).json({ error: 'Please write at least 8 characters.' });
+
+  const hasPurchase = await Order.exists({ user_id: req.session.user.id, status: 'approved' });
+  if (!hasPurchase) return res.status(403).json({ error: 'You can review only after purchasing an approved book.' });
+
+  await Testimonial.create({
+    name: req.session.user.name || 'Reader',
+    content: String(content).trim(),
+    rating: Math.min(5, Math.max(1, Number(rating || 5)))
+  });
+
+  res.json({ message: 'Thanks! Your review has been added.' });
 });
 
 app.get('/api/my-library', isAuth, async (req, res) => {
@@ -229,10 +267,17 @@ app.post('/api/contact', async (req, res) => {
   if (!name || !email || !message) return res.status(400).json({ error: 'All fields required' });
   await ContactMessage.create({ name, email, message });
   if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-    const transporter = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), secure: false, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } });
-    await transporter.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER, to: 'disamaze@gmail.com', subject: 'ReadifyBySam Contact Message', text: `Name: ${name}\nEmail: ${email}\n\n${message}` });
+    try {
+      const transporter = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), secure: false, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } });
+      await transporter.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER, to: 'disamaze@gmail.com', subject: 'ReadifyBySam Contact Message', text: `Name: ${name}
+Email: ${email}
+
+${message}` });
+    } catch (err) {
+      console.error('Contact email send failed:', err.message);
+    }
   }
-  res.json({ message: 'Message sent successfully!' });
+  res.json({ message: 'Message received! We will get back to you soon.' });
 });
 
 app.get('*', (req, res) => {

@@ -258,22 +258,35 @@ app.get('/api/admin/dashboard', isAuth, isAdmin, async (_, res) => {
 });
 
 app.post('/api/admin/books', isAuth, isAdmin, uploadBookImages.fields([{ name: 'cover_image', maxCount: 1 }, { name: 'preview_pages', maxCount: 8 }, { name: 'pdf', maxCount: 1 }]), async (req, res) => {
-  const { title, author, description, price } = req.body;
-  const pdfFile = req.files?.pdf?.[0];
-  const coverFile = req.files?.cover_image?.[0];
-  const previewFiles = req.files?.preview_pages || [];
-  if (!title || !author || !price || !pdfFile) return res.status(400).json({ error: 'Title, author, price and PDF are required' });
-  await Book.create({
-    title,
-    author,
-    description: description || '',
-    price: Number(price),
-    cover_url: '',
-    cover_image_path: coverFile ? `/uploads/books/${coverFile.filename}` : '',
-    preview_pages: previewFiles.map((f) => `/uploads/books/${f.filename}`),
-    pdf_path: `/uploads/books/${pdfFile.filename}`
-  });
-  res.json({ message: 'Book added successfully' });
+  try {
+    const { title, author, description, price } = req.body;
+    const pdfFile = req.files?.pdf?.[0];
+    const coverFile = req.files?.cover_image?.[0];
+    const previewFiles = req.files?.preview_pages || [];
+    const parsedPrice = Number(price);
+
+    if (!title || !author || !price || !pdfFile) {
+      return res.status(400).json({ error: 'Title, author, price and PDF are required' });
+    }
+    if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+      return res.status(400).json({ error: 'Please enter a valid price greater than 0.' });
+    }
+
+    await Book.create({
+      title: String(title).trim(),
+      author: String(author).trim(),
+      description: description ? String(description).trim() : '',
+      price: parsedPrice,
+      cover_url: '',
+      cover_image_path: coverFile ? `/uploads/books/${coverFile.filename}` : '',
+      preview_pages: previewFiles.map((f) => `/uploads/books/${f.filename}`),
+      pdf_path: `/uploads/books/${pdfFile.filename}`
+    });
+    res.json({ message: 'Book added successfully' });
+  } catch (err) {
+    console.error('Book upload failed:', err.message);
+    res.status(500).json({ error: 'Book upload failed. Please try again.' });
+  }
 });
 app.put('/api/admin/books/:id', isAuth, isAdmin, async (req, res) => { const { title, author, description, price } = req.body; await Book.findByIdAndUpdate(req.params.id, { title, author, description: description || '', price: Number(price) }); res.json({ message: 'Book updated' }); });
 app.delete('/api/admin/books/:id', isAuth, isAdmin, async (req, res) => { await Book.findByIdAndDelete(req.params.id); res.json({ message: 'Book deleted' }); });
@@ -290,6 +303,15 @@ app.post('/api/admin/settings/qr', isAuth, isAdmin, uploadQR.single('qr'), async
   current.upi_id = upi_id || '';
   await current.save();
   res.json({ message: 'UPI settings updated' });
+});
+
+app.use((err, req, res, next) => {
+  if (!err) return next();
+  if (err.name === 'MulterError') {
+    return res.status(400).json({ error: `Upload error: ${err.message}` });
+  }
+  console.error('Unhandled server error:', err.message);
+  return res.status(500).json({ error: 'Server error. Please try again.' });
 });
 
 app.get('*', (req, res) => {

@@ -193,6 +193,24 @@ app.post('/api/orders', isAuth, uploadPayment.single('payment_screenshot'), asyn
   res.json({ message: 'Order placed and pending admin approval.', orderId: order._id });
 });
 
+
+app.post('/api/user/testimonials', isAuth, async (req, res) => {
+  if (req.session.user.role !== 'user') return res.status(403).json({ error: 'Only users can submit reviews' });
+  const { content, rating } = req.body;
+  if (!content || String(content).trim().length < 8) return res.status(400).json({ error: 'Please write at least 8 characters.' });
+
+  const hasPurchase = await Order.exists({ user_id: req.session.user.id, status: 'approved' });
+  if (!hasPurchase) return res.status(403).json({ error: 'You can review only after purchasing an approved book.' });
+
+  await Testimonial.create({
+    name: req.session.user.name || 'Reader',
+    content: String(content).trim(),
+    rating: Math.min(5, Math.max(1, Number(rating || 5)))
+  });
+
+  res.json({ message: 'Thanks! Your review has been added.' });
+});
+
 app.get('/api/my-library', isAuth, async (req, res) => {
   if (req.session.user.role !== 'user') return res.status(403).json({ error: 'Only users can access library' });
   const orders = await Order.find({ user_id: req.session.user.id, status: 'approved' }).populate('items.book_id').sort({ createdAt: -1 }).lean();

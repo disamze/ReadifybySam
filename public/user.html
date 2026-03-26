@@ -56,6 +56,25 @@
   </section>
 
   <section id="stats" class="section wide grid"></section>
+
+  <section class="section wide review-shell">
+    <h3>Share Your Review</h3>
+    <form id="review-form" class="review-form">
+      <textarea id="review-content" placeholder="Write your review about purchased books" required></textarea>
+      <div class="review-actions">
+        <select id="review-rating">
+          <option value="5">5 - Excellent</option>
+          <option value="4">4 - Great</option>
+          <option value="3">3 - Good</option>
+          <option value="2">2 - Fair</option>
+          <option value="1">1 - Poor</option>
+        </select>
+        <button type="submit">Post Review</button>
+      </div>
+    </form>
+    <p id="review-msg" class="status"></p>
+  </section>
+
   <section id="testimonials" class="section wide"></section>
 
   <section id="contact" class="section wide contact-shell">

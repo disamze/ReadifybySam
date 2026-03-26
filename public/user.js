@@ -15,6 +15,12 @@ async function api(url, options = {}) {
   return data;
 }
 
+function renderTestimonials(list) {
+  q('#testimonials').innerHTML = `<h3>Testimonials</h3><div class="grid">${list
+    .map((t) => `<div class="panel"><b>${t.name}</b><p>${t.content}</p><small>${'⭐'.repeat(t.rating)}</small></div>`)
+    .join('')}</div>`;
+}
+
 function startTicker(events) {
   const ticker = q('#purchase-ticker');
   if (!events.length) {
@@ -75,10 +81,7 @@ async function bootstrap() {
     <div class="panel"><h3>${data.testimonials.length}</h3><p>Testimonials</p></div>
   `;
 
-  q('#testimonials').innerHTML = `<h3>Testimonials</h3><div class="grid">${data.testimonials
-    .map((t) => `<div class="panel"><b>${t.name}</b><p>${t.content}</p><small>${'⭐'.repeat(t.rating)}</small></div>`)
-    .join('')}</div>`;
-
+  renderTestimonials(data.testimonials || []);
   renderBookSlider(data.books || []);
   startTicker(purchases || []);
 
@@ -94,6 +97,24 @@ async function bootstrap() {
 
   hideLoader();
 }
+
+q('#review-form').onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    const resp = await api('/api/user/testimonials', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: q('#review-content').value, rating: q('#review-rating').value })
+    });
+    q('#review-msg').textContent = resp.message;
+    e.target.reset();
+
+    const fresh = await api('/api/public-data');
+    renderTestimonials(fresh.testimonials || []);
+  } catch (err) {
+    q('#review-msg').textContent = err.message;
+  }
+};
 
 q('#contact-form').onsubmit = async (e) => {
   e.preventDefault();

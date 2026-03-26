@@ -33,3 +33,9 @@
 
 .contact-shell { border: 1px solid #dbe4f3; border-radius: 16px; background: #fff; }
 .contact-form textarea { min-height: 120px; }
+
+.review-shell { border: 1px solid #dbe4f3; border-radius: 16px; background: #fff; }
+.review-form textarea { min-height: 110px; }
+.review-actions { display:flex; gap:.6rem; align-items:center; }
+.review-actions select { border: 1px solid #d8e3f4; border-radius: 10px; padding:.6rem; background:#fff; color:#1f2a44; }
+@media (max-width:640px){ .review-actions { flex-direction: column; align-items:stretch; } }

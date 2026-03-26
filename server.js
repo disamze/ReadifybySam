@@ -5,7 +5,6 @@ const express = require('express');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
-const nodemailer = require('nodemailer');
 const mongoose = require('mongoose');
 const MongoStore = require('connect-mongo');
 const MemoryStoreFactory = require('memorystore');
@@ -118,6 +117,14 @@ app.get('/healthz', (_, res) => {
   res.status(200).json({ ok: true, dbReady, uptime: process.uptime() });
 });
 
+app.post('/api/contact', async (req, res) => {
+  const { name, email, message } = req.body;
+  if (!name || !email || !message) return res.status(400).json({ error: 'All fields required' });
+  if (!dbReady) return res.status(503).json({ error: 'Please wait. Server is initializing.' });
+  await ContactMessage.create({ name: String(name).trim(), email: String(email).trim().toLowerCase(), message: String(message).trim() });
+  res.json({ message: 'Message sent successfully. Admin will contact you soon.' });
+});
+
 app.use('/api', requireDb);
 
 async function publicStats() {
@@ -223,8 +230,16 @@ app.get('/api/admin/dashboard', isAuth, isAdmin, async (_, res) => {
   const books = await Book.find({}).sort({ createdAt: -1 }).lean();
   const orders = await Order.find({}).populate('user_id').sort({ createdAt: -1 }).lean();
   const testimonials = await Testimonial.find({}).sort({ createdAt: -1 }).lean();
+  const messages = await ContactMessage.find({}).sort({ createdAt: -1 }).lean();
   const settings = await Settings.findOne().lean();
-  res.json({ users: users.map((u) => ({ id: u._id, name: u.name, email: u.email, role: u.role, created_at: u.createdAt })), books, orders: orders.map((o) => ({ ...o, id: o._id, user_name: o.user_id?.name || 'Unknown', user_email: o.user_id?.email || '-' })), testimonials, settings });
+  res.json({
+    users: users.map((u) => ({ id: u._id, name: u.name, email: u.email, role: u.role, created_at: u.createdAt })),
+    books,
+    orders: orders.map((o) => ({ ...o, id: o._id, user_name: o.user_id?.name || 'Unknown', user_email: o.user_id?.email || '-' })),
+    testimonials,
+    messages: messages.map((m) => ({ id: m._id, name: m.name, email: m.email, message: m.message, created_at: m.createdAt })),
+    settings
+  });
 });
 
 app.post('/api/admin/books', isAuth, isAdmin, uploadBookImages.fields([{ name: 'cover_image', maxCount: 1 }, { name: 'preview_pages', maxCount: 8 }, { name: 'pdf', maxCount: 1 }]), async (req, res) => {
@@ -260,24 +275,6 @@ app.post('/api/admin/settings/qr', isAuth, isAdmin, uploadQR.single('qr'), async
   current.upi_id = upi_id || '';
   await current.save();
   res.json({ message: 'UPI settings updated' });
-});
-
-app.post('/api/contact', async (req, res) => {
-  const { name, email, message } = req.body;
-  if (!name || !email || !message) return res.status(400).json({ error: 'All fields required' });
-  await ContactMessage.create({ name, email, message });
-  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-    try {
-      const transporter = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), secure: false, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } });
-      await transporter.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER, to: 'disamaze@gmail.com', subject: 'ReadifyBySam Contact Message', text: `Name: ${name}
-Email: ${email}
-
-${message}` });
-    } catch (err) {
-      console.error('Contact email send failed:', err.message);
-    }
-  }
-  res.json({ message: 'Message received! We will get back to you soon.' });
 });
 
 app.get('*', (req, res) => {

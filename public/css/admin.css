@@ -14,3 +14,21 @@
 #orders button, #users button, #testimonials button { margin-left: .45rem; }
 #books form, #testimonials form, #settings form { margin-bottom: 1rem; background:#f9fbff; border:1px solid #e2ebfa; padding:.8rem; border-radius:12px; }
 #books form label { display: block; margin: .45rem 0 .25rem; font-size: .9rem; color: #5871a8; font-weight: 700; }
+
+#messages .message-card {
+  padding: .8rem;
+  border: 1px solid #e1eaf9;
+  border-radius: 12px;
+  background: #fbfdff;
+  margin-bottom: .7rem;
+}
+
+#messages .message-card p {
+  margin: .15rem 0;
+  color: #334c7b;
+  word-break: break-word;
+}
+
+#messages .message-card small {
+  color: #6c7a96;
+}

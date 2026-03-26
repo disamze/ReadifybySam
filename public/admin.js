@@ -72,6 +72,20 @@ async function renderAdmin() {
     ${data.testimonials.map((t) => `<p>${t.name}: ${t.content} (${t.rating}) <button onclick="delTest('${t.id || t._id}')">Delete</button></p>`).join('')}
   `;
 
+  q('#messages').innerHTML = `
+    <h3>Messages From User</h3>
+    ${(data.messages || [])
+      .map(
+        (m) => `
+      <article class="message-card">
+        <p><b>${m.name}</b> • <a href="mailto:${m.email}">${m.email}</a></p>
+        <p>${m.message}</p>
+        <small>${new Date(m.created_at).toLocaleString()}</small>
+      </article>`
+      )
+      .join('') || '<p>No user messages yet.</p>'}
+  `;
+
   q('#settings').innerHTML = `
     <h3>UPI Settings</h3>
     ${settings.upi_qr_path ? `<img src="${settings.upi_qr_path}" style="max-width:200px;border-radius:12px"/>` : '<p>No QR uploaded</p>'}

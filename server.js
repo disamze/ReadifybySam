@@ -14,7 +14,9 @@ const app = express();
 const PORT = Number(process.env.PORT) || 10000;
 const MemoryStore = MemoryStoreFactory(session);
 const MONGODB_URI = process.env.MONGODB_URI;
+const CONTACT_TO_EMAIL = 'disamaze@gmail.com';
 let dbReady = false;
+let contactMailer;
 
 ['uploads/books', 'uploads/payments', 'uploads/qr'].forEach((dir) => {
   const full = path.join(__dirname, dir);
@@ -114,8 +116,56 @@ async function connectMongoWithRetry() {
   }
 }
 
+function getContactMailer() {
+  if (contactMailer) return contactMailer;
+  const { SMTP_HOST, SMTP_USER, SMTP_PASS } = process.env;
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) return null;
+  contactMailer = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: false,
+    auth: { user: SMTP_USER, pass: SMTP_PASS }
+  });
+  return contactMailer;
+}
+
 app.get('/healthz', (_, res) => {
   res.status(200).json({ ok: true, dbReady, uptime: process.uptime() });
+});
+
+app.post('/api/contact', async (req, res) => {
+  const { name, email, message } = req.body;
+  if (!name || !email || !message) return res.status(400).json({ error: 'All fields required' });
+
+  const mailer = getContactMailer();
+  if (!mailer) {
+    return res.status(503).json({ error: 'Contact email is not configured on server.' });
+  }
+
+  try {
+    await mailer.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: CONTACT_TO_EMAIL,
+      subject: 'ReadifyBySam Contact Message',
+      text: `Name: ${name}
+Email: ${email}
+
+${message}`
+    });
+  } catch (err) {
+    console.error('Contact email send failed:', err.message);
+    return res.status(502).json({ error: 'Unable to send your message right now. Please try again.' });
+  }
+
+  if (dbReady) {
+    try {
+      await ContactMessage.create({ name, email, message });
+    } catch (err) {
+      console.error('Contact message save failed:', err.message);
+    }
+  }
+
+  res.json({ message: 'Message sent successfully.' });
 });
 
 app.use('/api', requireDb);
@@ -260,24 +310,6 @@ app.post('/api/admin/settings/qr', isAuth, isAdmin, uploadQR.single('qr'), async
   current.upi_id = upi_id || '';
   await current.save();
   res.json({ message: 'UPI settings updated' });
-});
-
-app.post('/api/contact', async (req, res) => {
-  const { name, email, message } = req.body;
-  if (!name || !email || !message) return res.status(400).json({ error: 'All fields required' });
-  await ContactMessage.create({ name, email, message });
-  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-    try {
-      const transporter = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), secure: false, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } });
-      await transporter.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER, to: 'disamaze@gmail.com', subject: 'ReadifyBySam Contact Message', text: `Name: ${name}
-Email: ${email}
-
-${message}` });
-    } catch (err) {
-      console.error('Contact email send failed:', err.message);
-    }
-  }
-  res.json({ message: 'Message received! We will get back to you soon.' });
 });
 
 app.get('*', (req, res) => {

@@ -426,6 +426,89 @@ form {
     cursor: pointer;
 }
 
+.role-switch {
+    --pill-x: 0%;
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-radius: 999px;
+    padding: 4px;
+    margin: 12px 0 18px;
+    background: #eef2ff;
+    border: 1px solid #d9e2ff;
+    overflow: hidden;
+}
+
+.role-pill {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: calc(50% - 4px);
+    height: calc(100% - 8px);
+    border-radius: 999px;
+    background: linear-gradient(95deg, #5f7df0, #3fa7ee);
+    transform: translateX(var(--pill-x));
+    transition: transform .28s ease;
+    box-shadow: 0 7px 16px rgba(95, 125, 240, .35);
+    z-index: 0;
+}
+
+.role-btn {
+    position: relative;
+    z-index: 1;
+    border: none;
+    background: transparent;
+    color: #46609c;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 10px 8px;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: none;
+    transition: color .2s ease;
+}
+
+.role-btn.active {
+    color: #fff;
+}
+
+.auth-panel-form .status {
+    display: none;
+}
+
+.toast-container {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 120;
+    pointer-events: none;
+}
+
+.toast {
+    min-width: 260px;
+    max-width: 340px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, .22);
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity .22s ease, transform .22s ease;
+}
+
+.toast.success {
+    background: linear-gradient(120deg, #0f9f6e, #18b985);
+}
+
+.toast.error {
+    background: linear-gradient(120deg, #d63b58, #f05252);
+}
+
 .container p {
     margin: 15px 0;
     font-size: 14.5px;
@@ -838,8 +921,21 @@ form {
     .container.active .toggle-panel.toggle-right {
         bottom: 0;
     }
-}
-  .toggle-panel .btn { width: 128px; height: 40px; }
-  .toast-container { left: 10px; right: 10px; top: 10px; }
-  .toast { min-width: unset; max-width: unset; width: 100%; }
+
+    .toggle-panel .btn {
+        width: 128px;
+        height: 40px;
+    }
+
+    .toast-container {
+        left: 10px;
+        right: 10px;
+        top: 10px;
+    }
+
+    .toast {
+        min-width: unset;
+        max-width: unset;
+        width: 100%;
+    }
 }

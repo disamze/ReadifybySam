@@ -1,6 +1,21 @@
 const q = (s) => document.querySelector(s);
 q('#year').textContent = new Date().getFullYear();
 const hideLoader = () => { const l = q('#page-loader'); if (!l) return; l.style.opacity = '0'; setTimeout(() => (l.style.display = 'none'), 260); };
+const toastContainer = q('#toast-container');
+let adminBooks = [];
+
+function showToast(message, type = 'success') {
+  if (!toastContainer) return;
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  toastContainer.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(-8px)';
+    setTimeout(() => toast.remove(), 220);
+  }, 4200);
+}
 
 async function api(url, options = {}) {
   const res = await fetch(url, options);
@@ -30,6 +45,7 @@ q('#logout-btn').onclick = async () => {
 async function renderAdmin() {
   const data = await api('/api/admin/dashboard');
   const settings = data.settings || { upi_qr_path: '', upi_id: '' };
+  adminBooks = data.books || [];
 
   q('#overview').innerHTML = `
     <div class="panel"><h3>${data.users.length}</h3><p>Total Users</p></div>
@@ -48,15 +64,15 @@ async function renderAdmin() {
       <input name="description" placeholder="Description" />
       <input name="price" type="number" step="0.01" placeholder="Price" required />
       <label>Book Thumbnail / Cover Image</label>
-      <input name="cover_image" type="file" accept="image/*" required />
+      <input name="cover_image" type="file" accept="image/*" />
       <label>Preview Pages (optional, multiple images)</label>
       <input name="preview_pages" type="file" accept="image/*" multiple />
       <label>Main Book PDF</label>
       <input name="pdf" type="file" accept="application/pdf" required />
-      <button type="submit">Add Book</button>
+      <button type="submit" id="add-book-btn">Add Book</button>
     </form>
     <h4>Existing Books</h4>
-    ${data.books.map((b) => `<div class="panel"><p>${b.title} ₹${b.price}</p>${b.cover_image_path ? `<img src="${b.cover_image_path}" style="max-width:90px;border-radius:8px"/>` : ''}<p>Preview pages: ${(b.preview_pages || []).length}</p><button onclick="delBook('${b.id || b._id}')">Delete</button></div>`).join('') || '<p>No books yet.</p>'}
+    <div id="books-list">${adminBooks.map(bookCard).join('') || '<p>No books yet.</p>'}</div>
   `;
 
   q('#users').innerHTML = `<h3>Users Management</h3>${data.users.map((u) => `<p>${u.name} (${u.email}) role:${u.role} <button onclick="toggleRole('${u.id}', '${u.role === 'admin' ? 'user' : 'admin'}')">Make ${u.role === 'admin' ? 'user' : 'admin'}</button></p>`).join('')}`;
@@ -72,6 +88,20 @@ async function renderAdmin() {
     ${data.testimonials.map((t) => `<p>${t.name}: ${t.content} (${t.rating}) <button onclick="delTest('${t.id || t._id}')">Delete</button></p>`).join('')}
   `;
 
+  q('#messages').innerHTML = `
+    <h3>Messages From User</h3>
+    ${(data.messages || [])
+      .map(
+        (m) => `
+      <article class="message-card">
+        <p><b>${m.name}</b> • <a href="mailto:${m.email}">${m.email}</a></p>
+        <p>${m.message}</p>
+        <small>${new Date(m.created_at).toLocaleString()}</small>
+      </article>`
+      )
+      .join('') || '<p>No user messages yet.</p>'}
+  `;
+
   q('#settings').innerHTML = `
     <h3>UPI Settings</h3>
     ${settings.upi_qr_path ? `<img src="${settings.upi_qr_path}" style="max-width:200px;border-radius:12px"/>` : '<p>No QR uploaded</p>'}
@@ -84,31 +114,72 @@ async function renderAdmin() {
 
   q('#book-form').onsubmit = async (e) => {
     e.preventDefault();
-    await api('/api/admin/books', { method: 'POST', body: new FormData(e.target) });
-    renderAdmin();
+    const addBookBtn = q('#add-book-btn');
+    try {
+      addBookBtn.disabled = true;
+      addBookBtn.textContent = 'Uploading...';
+      await api('/api/admin/books', { method: 'POST', body: new FormData(e.target) });
+      await refreshBooksFromDb();
+      showToast('Book added successfully.', 'success');
+      e.target.reset();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      addBookBtn.disabled = false;
+      addBookBtn.textContent = 'Add Book';
+    }
   };
 
   q('#test-form').onsubmit = async (e) => {
     e.preventDefault();
-    const fd = new FormData(e.target);
-    await api('/api/admin/testimonials', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: fd.get('name'), content: fd.get('content'), rating: fd.get('rating') })
-    });
-    renderAdmin();
+    try {
+      const fd = new FormData(e.target);
+      await api('/api/admin/testimonials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: fd.get('name'), content: fd.get('content'), rating: fd.get('rating') })
+      });
+      showToast('Testimonial added.', 'success');
+      renderAdmin();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   };
 
   q('#qr-form').onsubmit = async (e) => {
     e.preventDefault();
-    await api('/api/admin/settings/qr', { method: 'POST', body: new FormData(e.target) });
-    renderAdmin();
+    try {
+      await api('/api/admin/settings/qr', { method: 'POST', body: new FormData(e.target) });
+      showToast('UPI settings updated.', 'success');
+      renderAdmin();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   };
 }
 
-window.delBook = async (id) => { await api(`/api/admin/books/${id}`, { method: 'DELETE' }); renderAdmin(); };
-window.setOrder = async (id, status) => { await api(`/api/admin/orders/${id}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) }); renderAdmin(); };
-window.toggleRole = async (id, role) => { await api(`/api/admin/users/${id}/role`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }) }); renderAdmin(); };
-window.delTest = async (id) => { await api(`/api/admin/testimonials/${id}`, { method: 'DELETE' }); renderAdmin(); };
+window.delBook = async (id) => {
+  try {
+    await api(`/api/admin/books/${id}`, { method: 'DELETE' });
+    await refreshBooksFromDb();
+    showToast('Book deleted.', 'success');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+window.setOrder = async (id, status) => { try { await api(`/api/admin/orders/${id}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) }); showToast(`Order ${status}.`, 'success'); renderAdmin(); } catch (err) { showToast(err.message, 'error'); } };
+window.toggleRole = async (id, role) => { try { await api(`/api/admin/users/${id}/role`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }) }); showToast('User role updated.', 'success'); renderAdmin(); } catch (err) { showToast(err.message, 'error'); } };
+window.delTest = async (id) => { try { await api(`/api/admin/testimonials/${id}`, { method: 'DELETE' }); showToast('Testimonial deleted.', 'success'); renderAdmin(); } catch (err) { showToast(err.message, 'error'); } };
+
+function bookCard(b) {
+  return `<div class="panel"><p>${b.title} ₹${b.price}</p>${b.cover_image_path ? `<img src="${b.cover_image_path}" style="max-width:90px;border-radius:8px"/>` : ''}<p>Preview pages: ${(b.preview_pages || []).length}</p><button onclick="delBook('${b.id || b._id}')">Delete</button></div>`;
+}
+
+async function refreshBooksFromDb() {
+  const dbBooks = await api('/api/books');
+  adminBooks = dbBooks || [];
+  const list = q('#books-list');
+  if (list) list.innerHTML = adminBooks.map(bookCard).join('') || '<p>No books yet.</p>';
+}
 
 bootstrap();

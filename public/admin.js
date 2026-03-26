@@ -1,6 +1,20 @@
 const q = (s) => document.querySelector(s);
 q('#year').textContent = new Date().getFullYear();
 const hideLoader = () => { const l = q('#page-loader'); if (!l) return; l.style.opacity = '0'; setTimeout(() => (l.style.display = 'none'), 260); };
+const toastContainer = q('#toast-container');
+
+function showToast(message, type = 'success') {
+  if (!toastContainer) return;
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  toastContainer.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(-8px)';
+    setTimeout(() => toast.remove(), 220);
+  }, 4200);
+}
 
 async function api(url, options = {}) {
   const res = await fetch(url, options);
@@ -48,7 +62,7 @@ async function renderAdmin() {
       <input name="description" placeholder="Description" />
       <input name="price" type="number" step="0.01" placeholder="Price" required />
       <label>Book Thumbnail / Cover Image</label>
-      <input name="cover_image" type="file" accept="image/*" required />
+      <input name="cover_image" type="file" accept="image/*" />
       <label>Preview Pages (optional, multiple images)</label>
       <input name="preview_pages" type="file" accept="image/*" multiple />
       <label>Main Book PDF</label>
@@ -98,31 +112,46 @@ async function renderAdmin() {
 
   q('#book-form').onsubmit = async (e) => {
     e.preventDefault();
-    await api('/api/admin/books', { method: 'POST', body: new FormData(e.target) });
-    renderAdmin();
+    try {
+      await api('/api/admin/books', { method: 'POST', body: new FormData(e.target) });
+      showToast('Book added successfully.', 'success');
+      renderAdmin();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   };
 
   q('#test-form').onsubmit = async (e) => {
     e.preventDefault();
-    const fd = new FormData(e.target);
-    await api('/api/admin/testimonials', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: fd.get('name'), content: fd.get('content'), rating: fd.get('rating') })
-    });
-    renderAdmin();
+    try {
+      const fd = new FormData(e.target);
+      await api('/api/admin/testimonials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: fd.get('name'), content: fd.get('content'), rating: fd.get('rating') })
+      });
+      showToast('Testimonial added.', 'success');
+      renderAdmin();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   };
 
   q('#qr-form').onsubmit = async (e) => {
     e.preventDefault();
-    await api('/api/admin/settings/qr', { method: 'POST', body: new FormData(e.target) });
-    renderAdmin();
+    try {
+      await api('/api/admin/settings/qr', { method: 'POST', body: new FormData(e.target) });
+      showToast('UPI settings updated.', 'success');
+      renderAdmin();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   };
 }
 
-window.delBook = async (id) => { await api(`/api/admin/books/${id}`, { method: 'DELETE' }); renderAdmin(); };
-window.setOrder = async (id, status) => { await api(`/api/admin/orders/${id}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) }); renderAdmin(); };
-window.toggleRole = async (id, role) => { await api(`/api/admin/users/${id}/role`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }) }); renderAdmin(); };
-window.delTest = async (id) => { await api(`/api/admin/testimonials/${id}`, { method: 'DELETE' }); renderAdmin(); };
+window.delBook = async (id) => { try { await api(`/api/admin/books/${id}`, { method: 'DELETE' }); showToast('Book deleted.', 'success'); renderAdmin(); } catch (err) { showToast(err.message, 'error'); } };
+window.setOrder = async (id, status) => { try { await api(`/api/admin/orders/${id}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) }); showToast(`Order ${status}.`, 'success'); renderAdmin(); } catch (err) { showToast(err.message, 'error'); } };
+window.toggleRole = async (id, role) => { try { await api(`/api/admin/users/${id}/role`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }) }); showToast('User role updated.', 'success'); renderAdmin(); } catch (err) { showToast(err.message, 'error'); } };
+window.delTest = async (id) => { try { await api(`/api/admin/testimonials/${id}`, { method: 'DELETE' }); showToast('Testimonial deleted.', 'success'); renderAdmin(); } catch (err) { showToast(err.message, 'error'); } };
 
 bootstrap();

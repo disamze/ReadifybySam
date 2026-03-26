@@ -32,3 +32,31 @@
 #messages .message-card small {
   color: #6c7a96;
 }
+
+.toast-container {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 160;
+  pointer-events: none;
+}
+
+.toast {
+  min-width: 260px;
+  max-width: 360px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, .22);
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity .22s ease, transform .22s ease;
+}
+
+.toast.success { background: linear-gradient(120deg, #0f9f6e, #18b985); }
+.toast.error { background: linear-gradient(120deg, #d63b58, #f05252); }

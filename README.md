@@ -8,7 +8,7 @@ Full-stack bookstore + admin dashboard designed for Render deployment with **Mon
 - Multi-page user experience: Home, Books, Cart/Checkout, Library.
 - Admin dashboard to manage books, testimonials, users, order approvals, and UPI QR.
 - Payment approval workflow: user gets PDF in library after admin approves order.
-- Contact form stores messages and optionally sends email to `disamaze@gmail.com`.
+- Contact form sends messages to `disamaze@gmail.com` (SMTP required) and stores them when DB is available.
 
 ## Local setup
 ```bash

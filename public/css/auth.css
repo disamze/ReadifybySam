@@ -109,6 +109,8 @@ body.auth-body {
     border-radius: 22px;
     margin: 10px;
   }
+  .container.active .form-box { right: 0; }
+
   .form-box {
     right: 0;
     width: 100%;
@@ -122,8 +124,8 @@ body.auth-body {
   .btn { height: 44px; }
   .form-box.login { bottom: 0; }
   .form-box.register { bottom: -100%; visibility: hidden; }
-  .container.active .form-box.login { bottom: 100%; visibility: hidden; }
-  .container.active .form-box.register { bottom: 0; visibility: visible; }
+  .container.active .form-box.login { bottom: 100%; visibility: hidden; z-index: 1; }
+  .container.active .form-box.register { bottom: 0; visibility: visible; z-index: 3; }
   .toggle-box {
     top: 0;
     left: 0;

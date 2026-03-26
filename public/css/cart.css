@@ -1,0 +1,8 @@
+@import url('/css/shared.css');
+
+.page-loader.cart-loader { background:#f8fbff; }
+.loader-cart { font-size: 34px; animation: wiggle .9s ease-in-out infinite; margin-bottom: 8px; }
+@keyframes wiggle {0%,100%{transform:rotate(0)}25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}
+
+#cart-list p { display:flex; justify-content: space-between; align-items: center; gap: .5rem; }
+#upi-box img { max-width: 230px; border-radius: 12px; border: 1px solid #dce8fb; }

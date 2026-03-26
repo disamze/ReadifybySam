@@ -1,7 +1,16 @@
 @import url('/css/shared.css');
 
+.page-loader.admin-loader { background: #f4f8ff; }
+.loader-bars { display:flex; gap:6px; margin-bottom:10px; }
+.loader-bars span { width:8px; height:26px; background:#5b7cfa; border-radius:8px; animation: bars .8s ease-in-out infinite; }
+.loader-bars span:nth-child(2){animation-delay:.15s}.loader-bars span:nth-child(3){animation-delay:.3s}
+@keyframes bars {0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
+
+#overview .panel h3 { font-size: 1.6rem; color:#2c4e91; margin: 0 0 .2rem; }
 #dashboard .hero-content h2 { color: #223a65; margin-bottom: .3rem; }
 #dashboard .hero-content p { color: #617090; }
-#orders p, #users p, #testimonials p { padding: .55rem 0; border-bottom: 1px solid #e6edf8; }
-#books form, #testimonials form, #settings form { margin-bottom: 1rem; }
+
+#orders p, #users p, #testimonials p { padding: .65rem 0; border-bottom: 1px solid #e6edf8; }
+#orders button, #users button, #testimonials button { margin-left: .45rem; }
+#books form, #testimonials form, #settings form { margin-bottom: 1rem; background:#f9fbff; border:1px solid #e2ebfa; padding:.8rem; border-radius:12px; }
 #books form label { display: block; margin: .45rem 0 .25rem; font-size: .9rem; color: #5871a8; font-weight: 700; }

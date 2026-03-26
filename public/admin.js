@@ -1,5 +1,6 @@
 const q = (s) => document.querySelector(s);
 q('#year').textContent = new Date().getFullYear();
+const hideLoader = () => { const l = q('#page-loader'); if (!l) return; l.style.opacity = '0'; setTimeout(() => (l.style.display = 'none'), 260); };
 
 async function api(url, options = {}) {
   const res = await fetch(url, options);
@@ -15,6 +16,7 @@ async function bootstrap() {
     if (user.role !== 'admin') return (location.href = '/user.html');
     q('#welcome').textContent = user.name;
     await renderAdmin();
+    hideLoader();
   } catch {
     location.href = '/';
   }

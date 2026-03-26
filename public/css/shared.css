@@ -121,3 +121,7 @@ footer { text-align: center; padding: 1.5rem; color: #7383a1; }
   .nav-inner { justify-content: center; }
   .actions-row { flex-direction: column; align-items: stretch; }
 }
+
+
+.page-loader { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; text-align: center; background: #f5f8ff; color: #5670a5; transition: opacity .3s ease; }
+.page-loader p { margin: 0; font-weight: 700; }

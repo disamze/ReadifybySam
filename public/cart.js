@@ -1,5 +1,6 @@
 const q = (s) => document.querySelector(s);
 q('#year').textContent = new Date().getFullYear();
+const hideLoader = () => { const l = q('#page-loader'); if (!l) return; l.style.opacity = '0'; setTimeout(() => (l.style.display = 'none'), 260); };
 
 const CART_KEY = 'readify_cart';
 const getCart = () => JSON.parse(localStorage.getItem(CART_KEY) || '[]');
@@ -55,4 +56,4 @@ window.removeItem = (idx) => {
   location.reload();
 };
 
-bootstrap().catch(() => location.href = '/');
+bootstrap().then(hideLoader).catch(() => location.href = '/');

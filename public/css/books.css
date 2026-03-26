@@ -1,0 +1,4 @@
+@import url('/css/shared.css');
+
+#books-grid .book h4 { margin: .5rem 0 .25rem; color: #27416f; }
+#books-grid .book img { width: 100%; max-height: 180px; object-fit: cover; border-radius: 10px; border: 1px solid #e1e8f6; }

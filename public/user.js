@@ -1,5 +1,20 @@
 const q = (s) => document.querySelector(s);
 q('#year').textContent = new Date().getFullYear();
+const toastContainer = q('#toast-container');
+
+function showToast(message, type = 'success') {
+  if (!toastContainer) return;
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  toastContainer.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(-6px)';
+    setTimeout(() => toast.remove(), 220);
+  }, 4500);
+}
 
 function hideLoader() {
   const loader = q('#page-loader');
@@ -122,12 +137,16 @@ q('#contact-form').onsubmit = async (e) => {
     const resp = await api('/api/contact', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: q('#cname').value, email: q('#cemail').value, message: q('#cmessage').value })
+      body: JSON.stringify({
+        name: q('#cname').value.trim(),
+        email: q('#cemail').value.trim(),
+        message: q('#cmessage').value.trim()
+      })
     });
-    q('#contact-msg').textContent = resp.message || 'Message sent successfully.';
+    showToast(resp.message || 'Message sent successfully.', 'success');
     e.target.reset();
   } catch (err) {
-    q('#contact-msg').textContent = err.message;
+    showToast(err.message, 'error');
   }
 };
 

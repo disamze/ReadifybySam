@@ -1,0 +1,7 @@
+@import url('/css/shared.css');
+
+#dashboard .hero-content h2 { color: #223a65; margin-bottom: .3rem; }
+#dashboard .hero-content p { color: #617090; }
+#orders p, #users p, #testimonials p { padding: .55rem 0; border-bottom: 1px solid #e6edf8; }
+#books form, #testimonials form, #settings form { margin-bottom: 1rem; }
+#books form label { display: block; margin: .45rem 0 .25rem; font-size: .9rem; color: #5871a8; font-weight: 700; }

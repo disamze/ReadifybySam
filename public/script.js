@@ -3,6 +3,21 @@ const container = q('.container');
 const registerBtn = q('.register-btn');
 const loginBtn = q('.login-btn');
 const loaderElement = q('.bookshelf_wrapper');
+const toastContainer = q('#toast-container');
+
+function showToast(message, type = 'success') {
+  if (!toastContainer) return;
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  toastContainer.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(-6px)';
+    setTimeout(() => toast.remove(), 220);
+  }, 5000);
+}
 
 const showLoader = (direction) => {
   if (!loaderElement) return;
@@ -77,7 +92,6 @@ roleSwitch?.querySelectorAll('.role-btn').forEach((btn, idx) => {
 
 q('#signup-form').onsubmit = async (e) => {
   e.preventDefault();
-  const msg = q('#signup-msg');
 
   try {
     await api('/api/auth/signup', {
@@ -91,18 +105,17 @@ q('#signup-form').onsubmit = async (e) => {
       })
     });
 
-    msg.textContent = 'Signup successful! Please sign in.';
     container?.classList.remove('active');
     q('#login-email').value = q('#signup-email').value.trim();
     q('#login-password').focus();
+    showToast('Registration successful. Please login now.', 'success');
   } catch (err) {
-    msg.textContent = err.message;
+    showToast(err.message, 'error');
   }
 };
 
 q('#login-form').onsubmit = async (e) => {
   e.preventDefault();
-  const msg = q('#login-msg');
 
   try {
     const { user } = await api('/api/auth/login', {
@@ -115,8 +128,11 @@ q('#login-form').onsubmit = async (e) => {
       })
     });
 
-    location.href = user.role === 'admin' ? '/admin.html' : '/user.html';
+    showToast('Login successful. Redirecting...', 'success');
+    setTimeout(() => {
+      location.href = user.role === 'admin' ? '/admin.html' : '/user.html';
+    }, 450);
   } catch (err) {
-    msg.textContent = err.message;
+    showToast(err.message, 'error');
   }
 };

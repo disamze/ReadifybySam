@@ -45,8 +45,11 @@ async function renderAdmin() {
       <input name="author" placeholder="Author" required />
       <input name="description" placeholder="Description" />
       <input name="price" type="number" step="0.01" placeholder="Price" required />
+      <label>Book Thumbnail / Cover Image</label>
       <input name="cover_image" type="file" accept="image/*" required />
+      <label>Preview Pages (optional, multiple images)</label>
       <input name="preview_pages" type="file" accept="image/*" multiple />
+      <label>Main Book PDF</label>
       <input name="pdf" type="file" accept="application/pdf" required />
       <button type="submit">Add Book</button>
     </form>

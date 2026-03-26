@@ -1,3 +1,29 @@
+const container = document.querySelector('.container');
+const registerBtn = document.querySelector('.register-btn');
+const loginBtn = document.querySelector('.login-btn');
+const loaderElement = document.querySelector('.bookshelf_wrapper');
+
+const showLoader = (direction) => {
+    loaderElement.classList.remove('loader-left', 'loader-right');
+    if (direction) {
+        loaderElement.classList.add(direction);
+    }
+    loaderElement.style.display = 'flex';
+    setTimeout(() => {
+        loaderElement.style.display = 'none';
+    }, 1800);
+};
+
+registerBtn.addEventListener('click', () => {
+    showLoader('loader-right');
+    container.classList.add('active');
+});
+
+loginBtn.addEventListener('click', () => {
+    showLoader('loader-left');
+    container.classList.remove('active');
+});
+
 const q = (s) => document.querySelector(s);
 const words = ['Reading', 'begins', 'here'];
 const loaderWord = q('#loader-word');
@@ -31,10 +57,6 @@ async function api(url, options = {}) {
   if (!res.ok) throw new Error(data.error || 'Request failed');
   return data;
 }
-
-const authShell = q('#auth-shell');
-q('#show-signup').onclick = () => authShell.classList.add('right-panel-active');
-q('#show-signin').onclick = () => authShell.classList.remove('right-panel-active');
 
 
 const roleSwitch = q('#login-role-switch');

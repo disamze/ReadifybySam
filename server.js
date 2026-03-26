@@ -13,7 +13,9 @@ const app = express();
 const PORT = Number(process.env.PORT) || 10000;
 const MemoryStore = MemoryStoreFactory(session);
 const MONGODB_URI = process.env.MONGODB_URI;
+const CONTACT_TO_EMAIL = 'disamaze@gmail.com';
 let dbReady = false;
+let contactMailer;
 
 ['uploads/books', 'uploads/payments', 'uploads/qr'].forEach((dir) => {
   const full = path.join(__dirname, dir);
@@ -111,6 +113,19 @@ async function connectMongoWithRetry() {
       await new Promise((r) => setTimeout(r, 3000));
     }
   }
+}
+
+function getContactMailer() {
+  if (contactMailer) return contactMailer;
+  const { SMTP_HOST, SMTP_USER, SMTP_PASS } = process.env;
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) return null;
+  contactMailer = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: false,
+    auth: { user: SMTP_USER, pass: SMTP_PASS }
+  });
+  return contactMailer;
 }
 
 app.get('/healthz', (_, res) => {

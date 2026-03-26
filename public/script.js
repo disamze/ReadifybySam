@@ -1,53 +1,74 @@
-const container = document.querySelector('.container');
-const registerBtn = document.querySelector('.register-btn');
-const loginBtn = document.querySelector('.login-btn');
-const loaderElement = document.querySelector('.bookshelf_wrapper');
+const q = (s) => document.querySelector(s);
+const container = q('.container');
+const registerBtn = q('.register-btn');
+const loginBtn = q('.login-btn');
+const loaderElement = q('.bookshelf_wrapper');
+const toastContainer = q('#toast-container');
+
+function showToast(message, type = 'success') {
+  if (!toastContainer) return;
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  toastContainer.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(-6px)';
+    setTimeout(() => toast.remove(), 220);
+  }, 5000);
+}
 
 const showLoader = (direction) => {
-    loaderElement.classList.remove('loader-left', 'loader-right');
-    if (direction) {
-        loaderElement.classList.add(direction);
-    }
-    loaderElement.style.display = 'flex';
-    setTimeout(() => {
-        loaderElement.style.display = 'none';
-    }, 1800);
+  if (!loaderElement) return;
+  loaderElement.classList.remove('loader-left', 'loader-right');
+  if (direction) loaderElement.classList.add(direction);
+  loaderElement.style.display = 'flex';
+  setTimeout(() => {
+    loaderElement.style.display = 'none';
+  }, 1800);
 };
 
-registerBtn.addEventListener('click', () => {
-    showLoader('loader-right');
-    container.classList.add('active');
+registerBtn?.addEventListener('click', () => {
+  showLoader('loader-right');
+  container?.classList.add('active');
 });
 
-loginBtn.addEventListener('click', () => {
-    showLoader('loader-left');
-    container.classList.remove('active');
+loginBtn?.addEventListener('click', () => {
+  showLoader('loader-left');
+  container?.classList.remove('active');
 });
 
-const q = (s) => document.querySelector(s);
 const words = ['Reading', 'begins', 'here'];
 const loaderWord = q('#loader-word');
 
 (function runLoader() {
+  if (!loaderWord || !q('#loader')) return;
   let index = 0;
   const start = performance.now();
   const duration = 3000;
+
   function animate(now) {
     const progress = Math.min(1, (now - start) / duration);
     const wordIndex = Math.min(words.length - 1, Math.floor(progress * words.length));
+
     if (wordIndex !== index) {
       index = wordIndex;
       loaderWord.textContent = words[index];
     }
-    if (progress < 1) requestAnimationFrame(animate);
-    else {
-      q('#loader').style.opacity = '0';
-      setTimeout(() => {
-        q('#loader').style.display = 'none';
-        q('#auth-screen').classList.remove('hidden');
-      }, 350);
+
+    if (progress < 1) {
+      requestAnimationFrame(animate);
+      return;
     }
+
+    const loader = q('#loader');
+    loader.style.opacity = '0';
+    setTimeout(() => {
+      loader.style.display = 'none';
+    }, 350);
   }
+
   requestAnimationFrame(animate);
 })();
 
@@ -58,10 +79,9 @@ async function api(url, options = {}) {
   return data;
 }
 
-
 const roleSwitch = q('#login-role-switch');
 const roleHidden = q('#login-role');
-roleSwitch.querySelectorAll('.role-btn').forEach((btn, idx) => {
+roleSwitch?.querySelectorAll('.role-btn').forEach((btn, idx) => {
   btn.onclick = () => {
     roleSwitch.querySelectorAll('.role-btn').forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
@@ -72,38 +92,47 @@ roleSwitch.querySelectorAll('.role-btn').forEach((btn, idx) => {
 
 q('#signup-form').onsubmit = async (e) => {
   e.preventDefault();
+
   try {
     await api('/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: q('#signup-name').value,
-        email: q('#signup-email').value,
+        name: q('#signup-name').value.trim(),
+        email: q('#signup-email').value.trim(),
         password: q('#signup-password').value,
         role: 'user'
       })
     });
-    q('#signup-msg').textContent = 'Signup successful! Please sign in.';
-    authShell.classList.remove('right-panel-active');
+
+    container?.classList.remove('active');
+    q('#login-email').value = q('#signup-email').value.trim();
+    q('#login-password').focus();
+    showToast('Registration successful. Please login now.', 'success');
   } catch (err) {
-    q('#signup-msg').textContent = err.message;
+    showToast(err.message, 'error');
   }
 };
 
 q('#login-form').onsubmit = async (e) => {
   e.preventDefault();
+
   try {
     const { user } = await api('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: q('#login-email').value,
+        email: q('#login-email').value.trim(),
         password: q('#login-password').value,
         role: q('#login-role').value
       })
     });
-    location.href = user.role === 'admin' ? '/admin.html' : '/user.html';
+
+    showToast('Login successful. Redirecting...', 'success');
+    setTimeout(() => {
+      location.href = user.role === 'admin' ? '/admin.html' : '/user.html';
+    }, 450);
   } catch (err) {
-    q('#login-msg').textContent = err.message;
+    showToast(err.message, 'error');
   }
 };

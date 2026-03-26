@@ -1,9 +1,9 @@
 :root {
-  --bg-1: #070a17;
-  --bg-2: #111a35;
+  --bg-1: #060915;
+  --bg-2: #121d3d;
   --text: #f4f7ff;
   --muted: #b8c2ec;
-  --line: rgba(255, 255, 255, .2);
+  --line: rgba(255, 255, 255, .22);
 }
 
 * { box-sizing: border-box; scroll-behavior: smooth; }
@@ -12,7 +12,11 @@ body {
   margin: 0;
   font-family: Manrope, system-ui, sans-serif;
   color: var(--text);
-  background: radial-gradient(circle at 20% 15%, #2f3a80 0%, transparent 30%), radial-gradient(circle at 80% 5%, #115e7f 0%, transparent 24%), linear-gradient(120deg, var(--bg-1), var(--bg-2));
+  background:
+    radial-gradient(circle at 20% 15%, #31408f 0%, transparent 30%),
+    radial-gradient(circle at 80% 5%, #0b748f 0%, transparent 24%),
+    radial-gradient(circle at 60% 85%, #1e2457 0%, transparent 30%),
+    linear-gradient(120deg, var(--bg-1), var(--bg-2));
 }
 
 .muted { color: var(--muted) }
@@ -24,14 +28,14 @@ body {
   top: 0;
   z-index: 50;
   backdrop-filter: blur(12px);
-  background: rgba(5, 10, 23, .75);
-  border-bottom: 1px solid rgba(255, 255, 255, .12)
+  background: rgba(5, 10, 23, .7);
+  border-bottom: 1px solid rgba(255, 255, 255, .14)
 }
 
 .nav-inner {
   max-width: 1200px;
   margin: auto;
-  padding: .8rem 1rem;
+  padding: .9rem 1rem;
   display: flex;
   gap: 1rem;
   align-items: center;
@@ -44,10 +48,13 @@ nav { display: flex; gap: .8rem; flex-wrap: wrap }
 nav a {
   color: var(--text);
   text-decoration: none;
-  padding: .4rem .72rem;
+  padding: .42rem .78rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, .08)
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid transparent;
+  transition: all .2s ease;
 }
+nav a:hover { border-color: rgba(255,255,255,.25); transform: translateY(-1px); }
 
 .cart-link {
   background: linear-gradient(90deg, rgba(124, 58, 237, .35), rgba(34, 211, 238, .28));
@@ -57,7 +64,7 @@ nav a {
 .nav-right { display: flex; align-items: center; gap: .7rem }
 
 .page { scroll-margin-top: 90px }
-.hero { padding: 2.3rem 1rem 2.4rem }
+.hero { padding: 2.6rem 1rem 2.8rem }
 .hero-content { text-align: center; max-width: 980px; margin: auto }
 
 .hero-chip {
@@ -65,41 +72,48 @@ nav a {
   padding: .35rem .8rem;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(255, 255, 255, .12)
+  background: rgba(255, 255, 255, .1)
 }
 
-.section { padding: 1.25rem 1rem; scroll-margin-top: 88px }
+.section { padding: 1.4rem 1rem; scroll-margin-top: 88px }
 .wide { max-width: 1200px; margin: auto }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.1rem }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.1rem }
 
 .book, .panel {
-  border-radius: 16px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, .12), rgba(255, 255, 255, .06));
-  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .06));
+  border: 1px solid rgba(255, 255, 255, .14);
   padding: 1rem 1.1rem;
-  box-shadow: 0 12px 26px rgba(0, 0, 0, .22);
-  margin-bottom: .2rem
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .24);
+  margin-bottom: .2rem;
+  transition: transform .2s ease, box-shadow .2s ease;
 }
+.book:hover, .panel:hover { transform: translateY(-3px); box-shadow: 0 18px 36px rgba(0,0,0,.3); }
 
 .panel p, .book p { margin: .6rem 0 }
 .actions-row { display: flex; gap: .6rem; align-items: center }
 
 button {
-  border: none;
-  border-radius: 8px;
-  padding: .55rem .9rem;
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 10px;
+  padding: .58rem .95rem;
   cursor: pointer;
+  color: #fff;
+  background: linear-gradient(95deg, #6d28d9, #0891b2);
+  transition: transform .2s ease, filter .2s ease;
 }
+button:hover { transform: translateY(-1px); filter: brightness(1.08); }
 
 input, textarea {
   width: 100%;
   border: 1px solid rgba(255,255,255,.25);
-  border-radius: 8px;
-  padding: .6rem .7rem;
+  border-radius: 10px;
+  padding: .65rem .75rem;
   background: rgba(255,255,255,.08);
   color: var(--text);
   margin-bottom: .55rem;
 }
+input::placeholder, textarea::placeholder { color: rgba(244,247,255,.75); }
 
 footer { text-align: center; padding: 1.6rem; color: var(--muted) }
 

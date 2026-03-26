@@ -11,7 +11,7 @@ const showLoader = (direction) => {
   loaderElement.style.display = 'flex';
   setTimeout(() => {
     loaderElement.style.display = 'none';
-  }, 1100);
+  }, 1800);
 };
 
 registerBtn?.addEventListener('click', () => {
@@ -31,7 +31,7 @@ const loaderWord = q('#loader-word');
   if (!loaderWord || !q('#loader')) return;
   let index = 0;
   const start = performance.now();
-  const duration = 2200;
+  const duration = 3000;
 
   function animate(now) {
     const progress = Math.min(1, (now - start) / duration);

@@ -1,10 +1,12 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const express = require('express');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
+const nodemailer = require('nodemailer');
 const mongoose = require('mongoose');
 const MongoStore = require('connect-mongo');
 const MemoryStoreFactory = require('memorystore');
@@ -12,15 +14,28 @@ const MemoryStoreFactory = require('memorystore');
 const app = express();
 const PORT = Number(process.env.PORT) || 10000;
 const MemoryStore = MemoryStoreFactory(session);
-const MONGODB_URI = process.env.MONGODB_URI;
+const rawMongoUri = process.env.MONGODB_URI || '';
+const MONGODB_URI = rawMongoUri.trim().replace(/^['"]|['"]$/g, '');
+const CLOUDINARY_CLOUD_NAME = (process.env.CLOUDINARY_CLOUD_NAME || '').trim();
+const CLOUDINARY_API_KEY = (process.env.CLOUDINARY_API_KEY || '').trim();
+const CLOUDINARY_API_SECRET = (process.env.CLOUDINARY_API_SECRET || '').trim();
+const CLOUDINARY_ENABLED = Boolean(CLOUDINARY_CLOUD_NAME && CLOUDINARY_API_KEY && CLOUDINARY_API_SECRET);
 const CONTACT_TO_EMAIL = 'disamaze@gmail.com';
 let dbReady = false;
 let contactMailer;
+let mongoConnectInProgress = false;
+
+const isMongoConnected = () => mongoose.connection.readyState === 1;
+
 
 ['uploads/books', 'uploads/payments', 'uploads/qr'].forEach((dir) => {
   const full = path.join(__dirname, dir);
   if (!fs.existsSync(full)) fs.mkdirSync(full, { recursive: true });
 });
+
+if (!CLOUDINARY_ENABLED) {
+  console.warn('Cloudinary is not configured. File uploads will use local disk (ephemeral on Render).');
+}
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -35,6 +50,7 @@ const sessionConfig = {
 if (MONGODB_URI) {
   sessionConfig.store = MongoStore.create({
     mongoUrl: MONGODB_URI,
+    mongoOptions: { family: 4 },
     ttl: 60 * 60 * 24,
     autoRemove: 'native'
   });
@@ -61,18 +77,98 @@ const Testimonial = mongoose.model('Testimonial', TestimonialSchema);
 const Order = mongoose.model('Order', OrderSchema);
 const ContactMessage = mongoose.model('ContactMessage', ContactSchema);
 
+function normalizeUploadPath(rawValue) {
+  if (!rawValue) return '';
+  const cleaned = String(rawValue).trim().replace(/\\/g, '/');
+  if (!cleaned) return '';
+  if (/^https?:\/\//i.test(cleaned)) return cleaned;
+  if (cleaned.startsWith('/uploads/')) return cleaned;
+  if (cleaned.startsWith('uploads/')) return `/${cleaned}`;
+
+  const marker = '/uploads/';
+  const idx = cleaned.toLowerCase().indexOf(marker);
+  if (idx >= 0) return cleaned.slice(idx);
+  return cleaned;
+}
+
+function serializeBook(book) {
+  const plain = typeof book.toObject === 'function' ? book.toObject() : book;
+  return {
+    ...plain,
+    id: plain.id || plain._id?.toString?.() || plain._id,
+    cover_image_path: normalizeUploadPath(plain.cover_image_path),
+    preview_pages: Array.isArray(plain.preview_pages) ? plain.preview_pages.map(normalizeUploadPath) : [],
+    pdf_path: normalizeUploadPath(plain.pdf_path)
+  };
+}
+
+mongoose.connection.on('connected', () => {
+  dbReady = true;
+  console.log('MongoDB connection is active.');
+});
+
+mongoose.connection.on('disconnected', () => {
+  dbReady = false;
+  console.warn('MongoDB disconnected. Attempting to reconnect...');
+  setTimeout(() => {
+    connectMongoWithRetry().catch((err) => console.error('Mongo reconnect failed:', err.message));
+  }, 2000);
+});
+
+mongoose.connection.on('error', (err) => {
+  if (!isMongoConnected()) dbReady = false;
+  console.error('MongoDB connection error:', err.message);
+});
+
+
 const storageBooks = multer.diskStorage({ destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/books')), filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`) });
 const storageBookImages = multer.diskStorage({ destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/books')), filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`) });
 const storagePayments = multer.diskStorage({ destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/payments')), filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`) });
 const storageQR = multer.diskStorage({ destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/qr')), filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`) });
 const uploadBook = multer({ storage: storageBooks });
-const uploadBookImages = multer({ storage: storageBookImages });
+const uploadBookImages = CLOUDINARY_ENABLED
+  ? multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 1000 * 1000 * 30, files: 12 }
+  })
+  : multer({ storage: storageBookImages });
 const uploadPayment = multer({ storage: storagePayments });
 const uploadQR = multer({ storage: storageQR });
 
+function cloudinarySignature(params) {
+  const bodyToSign = Object.keys(params)
+    .sort()
+    .map((key) => `${key}=${params[key]}`)
+    .join('&');
+  return crypto.createHash('sha1').update(`${bodyToSign}${CLOUDINARY_API_SECRET}`).digest('hex');
+}
+
+async function uploadToCloudinary(file, { folder, resourceType, publicId }) {
+  if (!CLOUDINARY_ENABLED) throw new Error('Cloudinary not configured');
+  const timestamp = Math.floor(Date.now() / 1000);
+  const params = { folder, public_id: publicId, timestamp };
+  const signature = cloudinarySignature(params);
+
+  const form = new FormData();
+  form.append('file', new Blob([file.buffer]), file.originalname);
+  form.append('api_key', CLOUDINARY_API_KEY);
+  form.append('timestamp', String(timestamp));
+  form.append('folder', folder);
+  form.append('public_id', publicId);
+  form.append('signature', signature);
+
+  const endpoint = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`;
+  const response = await fetch(endpoint, { method: 'POST', body: form });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error?.message || `Cloud upload failed (${response.status})`);
+  }
+  return data.secure_url;
+}
+
 const isAuth = (req, res, next) => (req.session.user ? next() : res.status(401).json({ error: 'Unauthorized' }));
 const isAdmin = (req, res, next) => (req.session.user?.role === 'admin' ? next() : res.status(403).json({ error: 'Forbidden' }));
-const requireDb = (_, res, next) => (dbReady ? next() : res.status(503).json({ error: 'Database initializing. Try again shortly.' }));
+const requireDb = (_, res, next) => ((dbReady && isMongoConnected()) ? next() : res.status(503).json({ error: 'Database not connected yet. Please check MongoDB URI/server and try again shortly.' }));
 
 async function seedMongo() {
   const adminEmail = (process.env.DEFAULT_ADMIN_EMAIL || 'admin@readifybysam.com').toLowerCase();
@@ -98,21 +194,39 @@ async function seedMongo() {
 }
 
 async function connectMongoWithRetry() {
-  if (!MONGODB_URI) return;
+  if (!MONGODB_URI) {
+    dbReady = false;
+    console.error('MONGODB_URI is missing. Set a valid Mongo connection string in your environment.');
+    return;
+  }
+  if (mongoConnectInProgress || dbReady) return;
+
+  mongoConnectInProgress = true;
   let attempts = 0;
-  while (!dbReady && attempts < 20) {
+
+  while (!dbReady) {
+    attempts += 1;
     try {
-      attempts += 1;
-      await mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 8000 });
+      await mongoose.connect(MONGODB_URI, {
+        serverSelectionTimeoutMS: 10000,
+        socketTimeoutMS: 45000,
+        maxPoolSize: 10,
+        family: 4
+      });
       await seedMongo();
-      dbReady = true;
+      dbReady = isMongoConnected();
       console.log('MongoDB connected.');
-      return;
+      break;
     } catch (err) {
+      dbReady = false;
+      const waitMs = Math.min(30000, 2000 + attempts * 1000);
       console.error(`MongoDB connect attempt ${attempts} failed: ${err.message}`);
-      await new Promise((r) => setTimeout(r, 3000));
+      console.error(`Retrying MongoDB connection in ${Math.round(waitMs / 1000)}s...`);
+      await new Promise((r) => setTimeout(r, waitMs));
     }
   }
+
+  mongoConnectInProgress = false;
 }
 
 function getContactMailer() {
@@ -129,7 +243,13 @@ function getContactMailer() {
 }
 
 app.get('/healthz', (_, res) => {
-  res.status(200).json({ ok: true, dbReady, uptime: process.uptime() });
+  res.status(200).json({
+    ok: true,
+    dbReady: dbReady && isMongoConnected(),
+    mongoConfigured: Boolean(MONGODB_URI),
+    mongoState: mongoose.connection.readyState,
+    uptime: process.uptime()
+  });
 });
 
 app.post('/api/contact', async (req, res) => {
@@ -146,7 +266,8 @@ async function publicStats() {
   const approvedOrders = await Order.find({ status: 'approved' }, { items: 1 });
   const purchased = approvedOrders.reduce((sum, order) => sum + order.items.reduce((acc, i) => acc + i.quantity, 0), 0);
   const testimonials = await Testimonial.find({}, { name: 1, content: 1, rating: 1 }).sort({ createdAt: -1 }).lean();
-  const books = await Book.find({}, { title: 1, author: 1, description: 1, price: 1, cover_url: 1, cover_image_path: 1, preview_pages: 1 }).sort({ createdAt: -1 }).lean();
+  const booksRaw = await Book.find({}, { title: 1, author: 1, description: 1, price: 1, cover_url: 1, cover_image_path: 1, preview_pages: 1, pdf_path: 1 }).sort({ createdAt: -1 }).lean();
+  const books = booksRaw.map(serializeBook);
   const settings = await Settings.findOne({}, { site_name: 1, upi_qr_path: 1, upi_id: 1 }).lean();
   return { purchased, testimonials, books, settings };
 }
@@ -191,7 +312,10 @@ app.post('/api/auth/login', async (req, res) => {
 app.post('/api/auth/logout', (req, res) => req.session.destroy(() => res.json({ message: 'Logged out' })));
 app.get('/api/auth/me', (req, res) => res.json({ user: req.session.user || null }));
 
-app.get('/api/books', async (_, res) => res.json(await Book.find({}, { title: 1, author: 1, description: 1, price: 1, cover_url: 1, cover_image_path: 1, preview_pages: 1 }).sort({ createdAt: -1 }).lean()));
+app.get('/api/books', async (_, res) => {
+  const books = await Book.find({}, { title: 1, author: 1, description: 1, price: 1, cover_url: 1, cover_image_path: 1, preview_pages: 1, pdf_path: 1 }).sort({ createdAt: -1 }).lean();
+  res.json(books.map(serializeBook));
+});
 
 app.post('/api/orders', isAuth, uploadPayment.single('payment_screenshot'), async (req, res) => {
   if (req.session.user.role !== 'user') return res.status(403).json({ error: 'Only users can place orders' });
@@ -236,13 +360,42 @@ app.post('/api/user/testimonials', isAuth, async (req, res) => {
 app.get('/api/my-library', isAuth, async (req, res) => {
   if (req.session.user.role !== 'user') return res.status(403).json({ error: 'Only users can access library' });
   const orders = await Order.find({ user_id: req.session.user.id, status: 'approved' }).populate('items.book_id').sort({ createdAt: -1 }).lean();
-  const books = orders.flatMap((o) => o.items.map((i) => i.book_id ? ({ id: i.book_id._id, title: i.book_id.title, author: i.book_id.author, pdf_path: i.book_id.pdf_path, status: o.status, created_at: o.createdAt }) : null).filter(Boolean));
+  const books = orders.flatMap((o) => o.items.map((i) => i.book_id ? ({
+    id: i.book_id._id,
+    title: i.book_id.title,
+    author: i.book_id.author,
+    pdf_path: normalizeUploadPath(i.book_id.pdf_path),
+    download_path: `/api/library/${i.book_id._id}/pdf`,
+    status: o.status,
+    created_at: o.createdAt
+  }) : null).filter(Boolean));
   res.json(books);
+});
+
+app.get('/api/library/:bookId/pdf', isAuth, async (req, res) => {
+  if (req.session.user.role !== 'user') return res.status(403).json({ error: 'Only users can access library' });
+  const { bookId } = req.params;
+  const hasPurchase = await Order.exists({
+    user_id: req.session.user.id,
+    status: 'approved',
+    'items.book_id': bookId
+  });
+  if (!hasPurchase) return res.status(403).json({ error: 'This book is not approved in your library yet.' });
+
+  const book = await Book.findById(bookId, { pdf_path: 1, title: 1 }).lean();
+  if (!book?.pdf_path) return res.status(404).json({ error: 'Book PDF not found.' });
+  const normalized = normalizeUploadPath(book.pdf_path);
+  if (/^https?:\/\//i.test(normalized)) return res.redirect(normalized);
+  if (!normalized.startsWith('/uploads/')) return res.status(400).json({ error: 'Invalid PDF path configured for this book.' });
+
+  const absolutePath = path.join(__dirname, normalized);
+  if (!fs.existsSync(absolutePath)) return res.status(404).json({ error: 'Book PDF file missing on server.' });
+  return res.sendFile(absolutePath);
 });
 
 app.get('/api/admin/dashboard', isAuth, isAdmin, async (_, res) => {
   const users = await User.find({}, { name: 1, email: 1, role: 1, createdAt: 1 }).sort({ createdAt: -1 }).lean();
-  const books = await Book.find({}).sort({ createdAt: -1 }).lean();
+  const books = (await Book.find({}).sort({ createdAt: -1 }).lean()).map(serializeBook);
   const orders = await Order.find({}).populate('user_id').sort({ createdAt: -1 }).lean();
   const testimonials = await Testimonial.find({}).sort({ createdAt: -1 }).lean();
   const messages = await ContactMessage.find({}).sort({ createdAt: -1 }).lean();
@@ -272,15 +425,45 @@ app.post('/api/admin/books', isAuth, isAdmin, uploadBookImages.fields([{ name: '
       return res.status(400).json({ error: 'Please enter a valid price greater than 0.' });
     }
 
+    const basePublicId = `${Date.now()}-${String(title).toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 45)}`;
+    let coverPath = coverFile ? `/uploads/books/${coverFile.filename}` : '';
+    let previewPaths = previewFiles.map((f) => `/uploads/books/${f.filename}`);
+    let pdfPath = `/uploads/books/${pdfFile.filename}`;
+
+    if (CLOUDINARY_ENABLED) {
+      const pdfPromise = uploadToCloudinary(pdfFile, {
+        folder: 'readify/books/pdf',
+        resourceType: 'raw',
+        publicId: `${basePublicId}-pdf`
+      });
+      const coverPromise = coverFile
+        ? uploadToCloudinary(coverFile, {
+          folder: 'readify/books/covers',
+          resourceType: 'image',
+          publicId: `${basePublicId}-cover`
+        })
+        : Promise.resolve('');
+
+      const previewPromise = Promise.all(
+        previewFiles.map((f, idx) => uploadToCloudinary(f, {
+          folder: 'readify/books/previews',
+          resourceType: 'image',
+          publicId: `${basePublicId}-preview-${idx + 1}`
+        }))
+      );
+
+      [pdfPath, coverPath, previewPaths] = await Promise.all([pdfPromise, coverPromise, previewPromise]);
+    }
+
     const createdBook = await Book.create({
       title: String(title).trim(),
       author: String(author).trim(),
       description: description ? String(description).trim() : '',
       price: parsedPrice,
       cover_url: '',
-      cover_image_path: coverFile ? `/uploads/books/${coverFile.filename}` : '',
-      preview_pages: previewFiles.map((f) => `/uploads/books/${f.filename}`),
-      pdf_path: `/uploads/books/${pdfFile.filename}`
+      cover_image_path: coverPath,
+      preview_pages: previewPaths,
+      pdf_path: pdfPath
     });
     res.json({ message: 'Book added successfully', book: createdBook });
   } catch (err) {
@@ -321,5 +504,5 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`ReadifyBySam listening on port ${PORT}`);
-  connectMongoWithRetry();
+  connectMongoWithRetry().catch((err) => console.error('Initial MongoDB connect error:', err.message));
 });

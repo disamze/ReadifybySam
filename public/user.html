@@ -6,12 +6,13 @@
   <title>ReadifyBySam | Home</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/user.css" />
 </head>
 <body>
   <div id="page-loader" class="page-loader user-loader"><div class="loader-orb"></div><p>Preparing your bookstore...</p></div>
-  <div class="sticky-nav">
+
+  <header class="sticky-nav">
     <div class="nav-inner">
       <h1>ReadifyBySam</h1>
       <nav>
@@ -23,70 +24,96 @@
       </nav>
       <div class="nav-right"><span id="welcome"></span><button id="logout-btn">Logout</button></div>
     </div>
-  </div>
+  </header>
 
-  <section id="home" class="hero page">
-    <div class="wide hero-content">
-      <p class="hero-chip">Professional bookstore platform</p>
-      <div id="book-anim" class="book-anim">
-        <div class="book-left"></div>
-        <div class="book-right"></div>
-        <div class="book-content">
-          <h2>Reading begins here.</h2>
-          <p>Premium books, smooth checkout, and instant library access after approval.</p>
+  <main>
+    <section id="home" class="hero page">
+      <div class="wide hero-layout">
+        <article class="hero-content">
+          <p class="hero-chip">Smart Academic Bookstore</p>
+          <h2>Board + Entrance prep books in one trusted store.</h2>
+          <p>Buy curriculum-focused books, pay securely, and unlock your digital library after approval.</p>
           <div class="hero-actions">
-            <a class="btn-link" href="/books.html">Explore Books</a>
-            <a class="btn-link ghost" href="/cart.html">Go to Cart</a>
+            <a class="btn-link" href="/books.html">Shop Books</a>
+            <a class="btn-link ghost" href="/library.html">Open Library</a>
+          </div>
+          <div class="hero-kpis">
+            <div><strong>10K+</strong><span>Learners</span></div>
+            <div><strong>500+</strong><span>Titles</span></div>
+            <div><strong>4.8★</strong><span>Ratings</span></div>
+          </div>
+        </article>
+
+        <div id="book-anim" class="book-anim">
+          <div class="book-left"></div>
+          <div class="book-right"></div>
+          <div class="book-content">
+            <h3>Fast checkout + instant updates</h3>
+            <p>Track live purchases, add your reviews, and keep all approved PDFs in one place.</p>
           </div>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <section class="section wide">
-    <h3>Trending Books</h3>
-    <div class="book-slider-shell">
-      <div id="book-slider" class="book-slider-track"></div>
-    </div>
-  </section>
-
-  <section class="section wide">
-    <h3>Live Purchasers</h3>
-    <div class="live-box"><p id="purchase-ticker">Loading recent purchases...</p></div>
-  </section>
-
-  <section id="stats" class="section wide grid"></section>
-
-  <section class="section wide review-shell">
-    <h3>Share Your Review</h3>
-    <form id="review-form" class="review-form">
-      <textarea id="review-content" placeholder="Write your review about purchased books" required></textarea>
-      <div class="review-actions">
-        <select id="review-rating">
-          <option value="5">5 - Excellent</option>
-          <option value="4">4 - Great</option>
-          <option value="3">3 - Good</option>
-          <option value="2">2 - Fair</option>
-          <option value="1">1 - Poor</option>
-        </select>
-        <button type="submit">Post Review</button>
+    <section class="section wide category-band">
+      <h3>Popular Categories</h3>
+      <div class="category-grid">
+        <article><h4>CBSE</h4><p>Class wise prep packs</p></article>
+        <article><h4>ICSE</h4><p>Concept + sample papers</p></article>
+        <article><h4>JEE</h4><p>Advanced problem books</p></article>
+        <article><h4>NEET</h4><p>MCQ heavy revision sets</p></article>
       </div>
-    </form>
-    <p id="review-msg" class="status"></p>
-  </section>
+    </section>
 
-  <section id="testimonials" class="section wide"></section>
+    <section class="section wide">
+      <div class="section-title-row"><h3>Trending Books</h3><a href="/books.html">View all</a></div>
+      <div class="book-slider-shell">
+        <div id="book-slider" class="book-slider-track"></div>
+      </div>
+    </section>
 
-  <section id="contact" class="section wide contact-shell">
-    <h3>Contact Us</h3>
-    <form id="contact-form" class="contact-form">
-      <input id="cname" placeholder="Your name" required />
-      <input id="cemail" type="email" placeholder="Your email" required />
-      <textarea id="cmessage" placeholder="Your message" required></textarea>
-      <button>Send Message</button>
-    </form>
-    <p id="contact-msg" class="status"></p>
-  </section>
+    <section class="section wide dual-cards">
+      <article class="live-card">
+        <h3>Live Purchasers</h3>
+        <p id="purchase-ticker">Loading recent purchases...</p>
+      </article>
+      <article class="stats-card">
+        <h3>Platform Stats</h3>
+        <div id="stats" class="grid"></div>
+      </article>
+    </section>
+
+    <section class="section wide review-shell">
+      <h3>Share Your Review</h3>
+      <form id="review-form" class="review-form">
+        <textarea id="review-content" placeholder="Write your review about purchased books" required></textarea>
+        <div class="review-actions">
+          <select id="review-rating">
+            <option value="5">5 - Excellent</option>
+            <option value="4">4 - Great</option>
+            <option value="3">3 - Good</option>
+            <option value="2">2 - Fair</option>
+            <option value="1">1 - Poor</option>
+          </select>
+          <button type="submit">Post Review</button>
+        </div>
+      </form>
+      <p id="review-msg" class="status"></p>
+    </section>
+
+    <section id="testimonials" class="section wide"></section>
+
+    <section id="contact" class="section wide contact-shell">
+      <h3>Contact Us</h3>
+      <form id="contact-form" class="contact-form">
+        <input id="cname" placeholder="Your name" required />
+        <input id="cemail" type="email" placeholder="Your email" required />
+        <textarea id="cmessage" placeholder="Your message" required></textarea>
+        <button>Send Message</button>
+      </form>
+      <p id="contact-msg" class="status"></p>
+    </section>
+  </main>
 
   <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
   <footer><p>© <span id="year"></span> ReadifyBySam • Trusted Learning Platform</p></footer>

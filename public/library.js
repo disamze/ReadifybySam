@@ -17,7 +17,9 @@ async function bootstrap() {
   q('#logout-btn').onclick = async () => { await api('/api/auth/logout', { method: 'POST' }); location.href = '/'; };
 
   const books = await api('/api/my-library');
-  q('#library-grid').innerHTML = books.map((b) => `<div class="panel"><h4>${b.title}</h4><p>${b.author}</p><a href="${b.pdf_path}" target="_blank">Open PDF</a></div>`).join('') || '<p>No approved books yet.</p>';
+  q('#library-grid').innerHTML = books
+    .map((b) => `<div class="panel"><h4>${b.title}</h4><p>${b.author}</p><a href="${b.download_path || b.pdf_path}" target="_blank" rel="noopener">Open PDF</a></div>`)
+    .join('') || '<p>No approved books yet.</p>';
 }
 
 bootstrap().then(hideLoader).catch(() => location.href = '/');

@@ -68,6 +68,30 @@ const Testimonial = mongoose.model('Testimonial', TestimonialSchema);
 const Order = mongoose.model('Order', OrderSchema);
 const ContactMessage = mongoose.model('ContactMessage', ContactSchema);
 
+function normalizeUploadPath(rawValue) {
+  if (!rawValue) return '';
+  const cleaned = String(rawValue).trim().replace(/\\/g, '/');
+  if (!cleaned) return '';
+  if (cleaned.startsWith('/uploads/')) return cleaned;
+  if (cleaned.startsWith('uploads/')) return `/${cleaned}`;
+
+  const marker = '/uploads/';
+  const idx = cleaned.toLowerCase().indexOf(marker);
+  if (idx >= 0) return cleaned.slice(idx);
+  return cleaned;
+}
+
+function serializeBook(book) {
+  const plain = typeof book.toObject === 'function' ? book.toObject() : book;
+  return {
+    ...plain,
+    id: plain.id || plain._id?.toString?.() || plain._id,
+    cover_image_path: normalizeUploadPath(plain.cover_image_path),
+    preview_pages: Array.isArray(plain.preview_pages) ? plain.preview_pages.map(normalizeUploadPath) : [],
+    pdf_path: normalizeUploadPath(plain.pdf_path)
+  };
+}
+
 mongoose.connection.on('connected', () => {
   dbReady = true;
   console.log('MongoDB connection is active.');
@@ -196,7 +220,8 @@ async function publicStats() {
   const approvedOrders = await Order.find({ status: 'approved' }, { items: 1 });
   const purchased = approvedOrders.reduce((sum, order) => sum + order.items.reduce((acc, i) => acc + i.quantity, 0), 0);
   const testimonials = await Testimonial.find({}, { name: 1, content: 1, rating: 1 }).sort({ createdAt: -1 }).lean();
-  const books = await Book.find({}, { title: 1, author: 1, description: 1, price: 1, cover_url: 1, cover_image_path: 1, preview_pages: 1 }).sort({ createdAt: -1 }).lean();
+  const booksRaw = await Book.find({}, { title: 1, author: 1, description: 1, price: 1, cover_url: 1, cover_image_path: 1, preview_pages: 1, pdf_path: 1 }).sort({ createdAt: -1 }).lean();
+  const books = booksRaw.map(serializeBook);
   const settings = await Settings.findOne({}, { site_name: 1, upi_qr_path: 1, upi_id: 1 }).lean();
   return { purchased, testimonials, books, settings };
 }
@@ -241,7 +266,10 @@ app.post('/api/auth/login', async (req, res) => {
 app.post('/api/auth/logout', (req, res) => req.session.destroy(() => res.json({ message: 'Logged out' })));
 app.get('/api/auth/me', (req, res) => res.json({ user: req.session.user || null }));
 
-app.get('/api/books', async (_, res) => res.json(await Book.find({}, { title: 1, author: 1, description: 1, price: 1, cover_url: 1, cover_image_path: 1, preview_pages: 1 }).sort({ createdAt: -1 }).lean()));
+app.get('/api/books', async (_, res) => {
+  const books = await Book.find({}, { title: 1, author: 1, description: 1, price: 1, cover_url: 1, cover_image_path: 1, preview_pages: 1, pdf_path: 1 }).sort({ createdAt: -1 }).lean();
+  res.json(books.map(serializeBook));
+});
 
 app.post('/api/orders', isAuth, uploadPayment.single('payment_screenshot'), async (req, res) => {
   if (req.session.user.role !== 'user') return res.status(403).json({ error: 'Only users can place orders' });
@@ -286,13 +314,41 @@ app.post('/api/user/testimonials', isAuth, async (req, res) => {
 app.get('/api/my-library', isAuth, async (req, res) => {
   if (req.session.user.role !== 'user') return res.status(403).json({ error: 'Only users can access library' });
   const orders = await Order.find({ user_id: req.session.user.id, status: 'approved' }).populate('items.book_id').sort({ createdAt: -1 }).lean();
-  const books = orders.flatMap((o) => o.items.map((i) => i.book_id ? ({ id: i.book_id._id, title: i.book_id.title, author: i.book_id.author, pdf_path: i.book_id.pdf_path, status: o.status, created_at: o.createdAt }) : null).filter(Boolean));
+  const books = orders.flatMap((o) => o.items.map((i) => i.book_id ? ({
+    id: i.book_id._id,
+    title: i.book_id.title,
+    author: i.book_id.author,
+    pdf_path: normalizeUploadPath(i.book_id.pdf_path),
+    download_path: `/api/library/${i.book_id._id}/pdf`,
+    status: o.status,
+    created_at: o.createdAt
+  }) : null).filter(Boolean));
   res.json(books);
+});
+
+app.get('/api/library/:bookId/pdf', isAuth, async (req, res) => {
+  if (req.session.user.role !== 'user') return res.status(403).json({ error: 'Only users can access library' });
+  const { bookId } = req.params;
+  const hasPurchase = await Order.exists({
+    user_id: req.session.user.id,
+    status: 'approved',
+    'items.book_id': bookId
+  });
+  if (!hasPurchase) return res.status(403).json({ error: 'This book is not approved in your library yet.' });
+
+  const book = await Book.findById(bookId, { pdf_path: 1, title: 1 }).lean();
+  if (!book?.pdf_path) return res.status(404).json({ error: 'Book PDF not found.' });
+  const normalized = normalizeUploadPath(book.pdf_path);
+  if (!normalized.startsWith('/uploads/')) return res.status(400).json({ error: 'Invalid PDF path configured for this book.' });
+
+  const absolutePath = path.join(__dirname, normalized);
+  if (!fs.existsSync(absolutePath)) return res.status(404).json({ error: 'Book PDF file missing on server.' });
+  return res.sendFile(absolutePath);
 });
 
 app.get('/api/admin/dashboard', isAuth, isAdmin, async (_, res) => {
   const users = await User.find({}, { name: 1, email: 1, role: 1, createdAt: 1 }).sort({ createdAt: -1 }).lean();
-  const books = await Book.find({}).sort({ createdAt: -1 }).lean();
+  const books = (await Book.find({}).sort({ createdAt: -1 }).lean()).map(serializeBook);
   const orders = await Order.find({}).populate('user_id').sort({ createdAt: -1 }).lean();
   const testimonials = await Testimonial.find({}).sort({ createdAt: -1 }).lean();
   const messages = await ContactMessage.find({}).sort({ createdAt: -1 }).lean();

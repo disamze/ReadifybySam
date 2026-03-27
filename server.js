@@ -20,6 +20,9 @@ let dbReady = false;
 let contactMailer;
 let mongoConnectInProgress = false;
 
+const isMongoConnected = () => mongoose.connection.readyState === 1;
+
+
 ['uploads/books', 'uploads/payments', 'uploads/qr'].forEach((dir) => {
   const full = path.join(__dirname, dir);
   if (!fs.existsSync(full)) fs.mkdirSync(full, { recursive: true });
@@ -38,6 +41,7 @@ const sessionConfig = {
 if (MONGODB_URI) {
   sessionConfig.store = MongoStore.create({
     mongoUrl: MONGODB_URI,
+    mongoOptions: { family: 4 },
     ttl: 60 * 60 * 24,
     autoRemove: 'native'
   });
@@ -64,8 +68,12 @@ const Testimonial = mongoose.model('Testimonial', TestimonialSchema);
 const Order = mongoose.model('Order', OrderSchema);
 const ContactMessage = mongoose.model('ContactMessage', ContactSchema);
 
+mongoose.connection.on('connected', () => {
+  dbReady = true;
+  console.log('MongoDB connection is active.');
+});
+
 mongoose.connection.on('disconnected', () => {
-  if (!dbReady) return;
   dbReady = false;
   console.warn('MongoDB disconnected. Attempting to reconnect...');
   setTimeout(() => {
@@ -74,7 +82,7 @@ mongoose.connection.on('disconnected', () => {
 });
 
 mongoose.connection.on('error', (err) => {
-  dbReady = false;
+  if (!isMongoConnected()) dbReady = false;
   console.error('MongoDB connection error:', err.message);
 });
 
@@ -90,7 +98,7 @@ const uploadQR = multer({ storage: storageQR });
 
 const isAuth = (req, res, next) => (req.session.user ? next() : res.status(401).json({ error: 'Unauthorized' }));
 const isAdmin = (req, res, next) => (req.session.user?.role === 'admin' ? next() : res.status(403).json({ error: 'Forbidden' }));
-const requireDb = (_, res, next) => (dbReady ? next() : res.status(503).json({ error: 'Database not connected yet. Please check MongoDB URI/server and try again shortly.' }));
+const requireDb = (_, res, next) => ((dbReady && isMongoConnected()) ? next() : res.status(503).json({ error: 'Database not connected yet. Please check MongoDB URI/server and try again shortly.' }));
 
 async function seedMongo() {
   const adminEmail = (process.env.DEFAULT_ADMIN_EMAIL || 'admin@readifybysam.com').toLowerCase();
@@ -132,10 +140,11 @@ async function connectMongoWithRetry() {
       await mongoose.connect(MONGODB_URI, {
         serverSelectionTimeoutMS: 10000,
         socketTimeoutMS: 45000,
-        maxPoolSize: 10
+        maxPoolSize: 10,
+        family: 4
       });
       await seedMongo();
-      dbReady = true;
+      dbReady = isMongoConnected();
       console.log('MongoDB connected.');
       break;
     } catch (err) {
@@ -166,7 +175,7 @@ function getContactMailer() {
 app.get('/healthz', (_, res) => {
   res.status(200).json({
     ok: true,
-    dbReady,
+    dbReady: dbReady && isMongoConnected(),
     mongoConfigured: Boolean(MONGODB_URI),
     mongoState: mongoose.connection.readyState,
     uptime: process.uptime()

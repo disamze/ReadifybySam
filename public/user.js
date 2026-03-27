@@ -2,6 +2,19 @@ const q = (s) => document.querySelector(s);
 q('#year').textContent = new Date().getFullYear();
 const toastContainer = q('#toast-container');
 
+
+function resolveBookCover(book) {
+  const raw = book?.cover_image_path || book?.cover_url || '';
+  const cleaned = String(raw).trim().replace(/\\/g, '/');
+  if (!cleaned) return '';
+  if (cleaned.startsWith('/uploads/')) return cleaned;
+  if (/^https?:\/\//i.test(cleaned)) return cleaned;
+  if (cleaned.startsWith('uploads/')) return `/${cleaned}`;
+  const uploadsStart = cleaned.toLowerCase().indexOf('/uploads/');
+  if (uploadsStart >= 0) return cleaned.slice(uploadsStart);
+  return cleaned;
+}
+
 function showToast(message, type = 'success') {
   if (!toastContainer) return;
   const toast = document.createElement('div');
@@ -66,15 +79,16 @@ function renderBookSlider(books) {
   const items = books.slice(0, 10);
   const doubled = [...items, ...items];
   track.innerHTML = doubled
-    .map(
-      (b) => `
+    .map((b) => {
+      const cover = resolveBookCover(b);
+      return `
       <article class="slide-card">
-        ${b.cover_image_path ? `<img src="${b.cover_image_path}" alt="${b.title}" />` : ''}
+        ${cover ? `<img src="${cover}" alt="${b.title}" loading="lazy" onerror="this.style.display='none'" />` : ''}
         <h4>${b.title}</h4>
         <p>${b.author || ''}</p>
         <strong>₹${b.price}</strong>
-      </article>`
-    )
+      </article>`;
+    })
     .join('');
 }
 

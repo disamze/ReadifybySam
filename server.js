@@ -1,6 +1,7 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const express = require('express');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
@@ -15,6 +16,10 @@ const PORT = Number(process.env.PORT) || 10000;
 const MemoryStore = MemoryStoreFactory(session);
 const rawMongoUri = process.env.MONGODB_URI || '';
 const MONGODB_URI = rawMongoUri.trim().replace(/^['"]|['"]$/g, '');
+const CLOUDINARY_CLOUD_NAME = (process.env.CLOUDINARY_CLOUD_NAME || '').trim();
+const CLOUDINARY_API_KEY = (process.env.CLOUDINARY_API_KEY || '').trim();
+const CLOUDINARY_API_SECRET = (process.env.CLOUDINARY_API_SECRET || '').trim();
+const CLOUDINARY_ENABLED = Boolean(CLOUDINARY_CLOUD_NAME && CLOUDINARY_API_KEY && CLOUDINARY_API_SECRET);
 const CONTACT_TO_EMAIL = 'disamaze@gmail.com';
 let dbReady = false;
 let contactMailer;
@@ -27,6 +32,10 @@ const isMongoConnected = () => mongoose.connection.readyState === 1;
   const full = path.join(__dirname, dir);
   if (!fs.existsSync(full)) fs.mkdirSync(full, { recursive: true });
 });
+
+if (!CLOUDINARY_ENABLED) {
+  console.warn('Cloudinary is not configured. File uploads will use local disk (ephemeral on Render).');
+}
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -72,6 +81,7 @@ function normalizeUploadPath(rawValue) {
   if (!rawValue) return '';
   const cleaned = String(rawValue).trim().replace(/\\/g, '/');
   if (!cleaned) return '';
+  if (/^https?:\/\//i.test(cleaned)) return cleaned;
   if (cleaned.startsWith('/uploads/')) return cleaned;
   if (cleaned.startsWith('uploads/')) return `/${cleaned}`;
 
@@ -116,9 +126,45 @@ const storageBookImages = multer.diskStorage({ destination: (_, __, cb) => cb(nu
 const storagePayments = multer.diskStorage({ destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/payments')), filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`) });
 const storageQR = multer.diskStorage({ destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/qr')), filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`) });
 const uploadBook = multer({ storage: storageBooks });
-const uploadBookImages = multer({ storage: storageBookImages });
+const uploadBookImages = CLOUDINARY_ENABLED
+  ? multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 1000 * 1000 * 30, files: 12 }
+  })
+  : multer({ storage: storageBookImages });
 const uploadPayment = multer({ storage: storagePayments });
 const uploadQR = multer({ storage: storageQR });
+
+function cloudinarySignature(params) {
+  const bodyToSign = Object.keys(params)
+    .sort()
+    .map((key) => `${key}=${params[key]}`)
+    .join('&');
+  return crypto.createHash('sha1').update(`${bodyToSign}${CLOUDINARY_API_SECRET}`).digest('hex');
+}
+
+async function uploadToCloudinary(file, { folder, resourceType, publicId }) {
+  if (!CLOUDINARY_ENABLED) throw new Error('Cloudinary not configured');
+  const timestamp = Math.floor(Date.now() / 1000);
+  const params = { folder, public_id: publicId, timestamp };
+  const signature = cloudinarySignature(params);
+
+  const form = new FormData();
+  form.append('file', new Blob([file.buffer]), file.originalname);
+  form.append('api_key', CLOUDINARY_API_KEY);
+  form.append('timestamp', String(timestamp));
+  form.append('folder', folder);
+  form.append('public_id', publicId);
+  form.append('signature', signature);
+
+  const endpoint = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`;
+  const response = await fetch(endpoint, { method: 'POST', body: form });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error?.message || `Cloud upload failed (${response.status})`);
+  }
+  return data.secure_url;
+}
 
 const isAuth = (req, res, next) => (req.session.user ? next() : res.status(401).json({ error: 'Unauthorized' }));
 const isAdmin = (req, res, next) => (req.session.user?.role === 'admin' ? next() : res.status(403).json({ error: 'Forbidden' }));
@@ -339,6 +385,7 @@ app.get('/api/library/:bookId/pdf', isAuth, async (req, res) => {
   const book = await Book.findById(bookId, { pdf_path: 1, title: 1 }).lean();
   if (!book?.pdf_path) return res.status(404).json({ error: 'Book PDF not found.' });
   const normalized = normalizeUploadPath(book.pdf_path);
+  if (/^https?:\/\//i.test(normalized)) return res.redirect(normalized);
   if (!normalized.startsWith('/uploads/')) return res.status(400).json({ error: 'Invalid PDF path configured for this book.' });
 
   const absolutePath = path.join(__dirname, normalized);
@@ -378,15 +425,45 @@ app.post('/api/admin/books', isAuth, isAdmin, uploadBookImages.fields([{ name: '
       return res.status(400).json({ error: 'Please enter a valid price greater than 0.' });
     }
 
+    const basePublicId = `${Date.now()}-${String(title).toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 45)}`;
+    let coverPath = coverFile ? `/uploads/books/${coverFile.filename}` : '';
+    let previewPaths = previewFiles.map((f) => `/uploads/books/${f.filename}`);
+    let pdfPath = `/uploads/books/${pdfFile.filename}`;
+
+    if (CLOUDINARY_ENABLED) {
+      const pdfPromise = uploadToCloudinary(pdfFile, {
+        folder: 'readify/books/pdf',
+        resourceType: 'raw',
+        publicId: `${basePublicId}-pdf`
+      });
+      const coverPromise = coverFile
+        ? uploadToCloudinary(coverFile, {
+          folder: 'readify/books/covers',
+          resourceType: 'image',
+          publicId: `${basePublicId}-cover`
+        })
+        : Promise.resolve('');
+
+      const previewPromise = Promise.all(
+        previewFiles.map((f, idx) => uploadToCloudinary(f, {
+          folder: 'readify/books/previews',
+          resourceType: 'image',
+          publicId: `${basePublicId}-preview-${idx + 1}`
+        }))
+      );
+
+      [pdfPath, coverPath, previewPaths] = await Promise.all([pdfPromise, coverPromise, previewPromise]);
+    }
+
     const createdBook = await Book.create({
       title: String(title).trim(),
       author: String(author).trim(),
       description: description ? String(description).trim() : '',
       price: parsedPrice,
       cover_url: '',
-      cover_image_path: coverFile ? `/uploads/books/${coverFile.filename}` : '',
-      preview_pages: previewFiles.map((f) => `/uploads/books/${f.filename}`),
-      pdf_path: `/uploads/books/${pdfFile.filename}`
+      cover_image_path: coverPath,
+      preview_pages: previewPaths,
+      pdf_path: pdfPath
     });
     res.json({ message: 'Book added successfully', book: createdBook });
   } catch (err) {

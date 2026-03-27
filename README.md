@@ -22,6 +22,17 @@ Open `http://localhost:10000`.
 - `MONGODB_URI` (MongoDB Atlas/local connection string)
 - `SESSION_SECRET`
 
+## Persistent file storage on Render (critical)
+Render filesystem is ephemeral, so local `/uploads` files are lost on redeploy/restart.
+For production media persistence (book covers + PDFs), configure Cloudinary:
+
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
+
+When these are set, admin uploads stream directly to Cloudinary and URLs are stored in MongoDB.
+Without them, uploads use local disk (good for local dev only).
+
 ## Default admin (seeded)
 - Email: from `DEFAULT_ADMIN_EMAIL`
 - Password: from `DEFAULT_ADMIN_PASSWORD`

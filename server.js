@@ -5,6 +5,7 @@ const express = require('express');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
+const nodemailer = require('nodemailer');
 const mongoose = require('mongoose');
 const MongoStore = require('connect-mongo');
 const MemoryStoreFactory = require('memorystore');
@@ -12,10 +13,12 @@ const MemoryStoreFactory = require('memorystore');
 const app = express();
 const PORT = Number(process.env.PORT) || 10000;
 const MemoryStore = MemoryStoreFactory(session);
-const MONGODB_URI = process.env.MONGODB_URI;
+const rawMongoUri = process.env.MONGODB_URI || '';
+const MONGODB_URI = rawMongoUri.trim().replace(/^['"]|['"]$/g, '');
 const CONTACT_TO_EMAIL = 'disamaze@gmail.com';
 let dbReady = false;
 let contactMailer;
+let mongoConnectInProgress = false;
 
 ['uploads/books', 'uploads/payments', 'uploads/qr'].forEach((dir) => {
   const full = path.join(__dirname, dir);
@@ -61,6 +64,21 @@ const Testimonial = mongoose.model('Testimonial', TestimonialSchema);
 const Order = mongoose.model('Order', OrderSchema);
 const ContactMessage = mongoose.model('ContactMessage', ContactSchema);
 
+mongoose.connection.on('disconnected', () => {
+  if (!dbReady) return;
+  dbReady = false;
+  console.warn('MongoDB disconnected. Attempting to reconnect...');
+  setTimeout(() => {
+    connectMongoWithRetry().catch((err) => console.error('Mongo reconnect failed:', err.message));
+  }, 2000);
+});
+
+mongoose.connection.on('error', (err) => {
+  dbReady = false;
+  console.error('MongoDB connection error:', err.message);
+});
+
+
 const storageBooks = multer.diskStorage({ destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/books')), filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`) });
 const storageBookImages = multer.diskStorage({ destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/books')), filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`) });
 const storagePayments = multer.diskStorage({ destination: (_, __, cb) => cb(null, path.join(__dirname, 'uploads/payments')), filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`) });
@@ -72,7 +90,7 @@ const uploadQR = multer({ storage: storageQR });
 
 const isAuth = (req, res, next) => (req.session.user ? next() : res.status(401).json({ error: 'Unauthorized' }));
 const isAdmin = (req, res, next) => (req.session.user?.role === 'admin' ? next() : res.status(403).json({ error: 'Forbidden' }));
-const requireDb = (_, res, next) => (dbReady ? next() : res.status(503).json({ error: 'Database initializing. Try again shortly.' }));
+const requireDb = (_, res, next) => (dbReady ? next() : res.status(503).json({ error: 'Database not connected yet. Please check MongoDB URI/server and try again shortly.' }));
 
 async function seedMongo() {
   const adminEmail = (process.env.DEFAULT_ADMIN_EMAIL || 'admin@readifybysam.com').toLowerCase();
@@ -98,21 +116,38 @@ async function seedMongo() {
 }
 
 async function connectMongoWithRetry() {
-  if (!MONGODB_URI) return;
+  if (!MONGODB_URI) {
+    dbReady = false;
+    console.error('MONGODB_URI is missing. Set a valid Mongo connection string in your environment.');
+    return;
+  }
+  if (mongoConnectInProgress || dbReady) return;
+
+  mongoConnectInProgress = true;
   let attempts = 0;
-  while (!dbReady && attempts < 20) {
+
+  while (!dbReady) {
+    attempts += 1;
     try {
-      attempts += 1;
-      await mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 8000 });
+      await mongoose.connect(MONGODB_URI, {
+        serverSelectionTimeoutMS: 10000,
+        socketTimeoutMS: 45000,
+        maxPoolSize: 10
+      });
       await seedMongo();
       dbReady = true;
       console.log('MongoDB connected.');
-      return;
+      break;
     } catch (err) {
+      dbReady = false;
+      const waitMs = Math.min(30000, 2000 + attempts * 1000);
       console.error(`MongoDB connect attempt ${attempts} failed: ${err.message}`);
-      await new Promise((r) => setTimeout(r, 3000));
+      console.error(`Retrying MongoDB connection in ${Math.round(waitMs / 1000)}s...`);
+      await new Promise((r) => setTimeout(r, waitMs));
     }
   }
+
+  mongoConnectInProgress = false;
 }
 
 function getContactMailer() {
@@ -129,7 +164,13 @@ function getContactMailer() {
 }
 
 app.get('/healthz', (_, res) => {
-  res.status(200).json({ ok: true, dbReady, uptime: process.uptime() });
+  res.status(200).json({
+    ok: true,
+    dbReady,
+    mongoConfigured: Boolean(MONGODB_URI),
+    mongoState: mongoose.connection.readyState,
+    uptime: process.uptime()
+  });
 });
 
 app.post('/api/contact', async (req, res) => {
@@ -321,5 +362,5 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`ReadifyBySam listening on port ${PORT}`);
-  connectMongoWithRetry();
+  connectMongoWithRetry().catch((err) => console.error('Initial MongoDB connect error:', err.message));
 });

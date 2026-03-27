@@ -2,6 +2,21 @@ const q = (s) => document.querySelector(s);
 q('#year').textContent = new Date().getFullYear();
 const toastContainer = q('#toast-container');
 
+
+const FALLBACK_COVER = 'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=700&q=80';
+
+function resolveBookCover(book) {
+  const raw = book?.cover_image_path || book?.cover_url || '';
+  const cleaned = String(raw).trim().replace(/\\/g, '/');
+  if (!cleaned) return FALLBACK_COVER;
+  if (cleaned.startsWith('/uploads/')) return cleaned;
+  if (/^https?:\/\//i.test(cleaned)) return cleaned;
+  if (cleaned.startsWith('uploads/')) return `/${cleaned}`;
+  const uploadsStart = cleaned.toLowerCase().indexOf('/uploads/');
+  if (uploadsStart >= 0) return cleaned.slice(uploadsStart);
+  return cleaned;
+}
+
 function showToast(message, type = 'success') {
   if (!toastContainer) return;
   const toast = document.createElement('div');
@@ -69,7 +84,7 @@ function renderBookSlider(books) {
     .map(
       (b) => `
       <article class="slide-card">
-        ${b.cover_image_path ? `<img src="${b.cover_image_path}" alt="${b.title}" />` : ''}
+        <img src="${resolveBookCover(b)}" alt="${b.title}" loading="lazy" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'" />
         <h4>${b.title}</h4>
         <p>${b.author || ''}</p>
         <strong>₹${b.price}</strong>
